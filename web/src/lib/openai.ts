@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ContentPackage, Pairing, SavedPost } from "./domain";
+import type { ContentFormat, ContentPackage, Pairing, SavedPost } from "./domain";
 import { CONTENT_PILLARS, contentPackageSchema } from "./content-package-schema";
 import { parseStructuredJson } from "./openai-response";
 
@@ -70,6 +70,7 @@ const schema = {
 export async function generateContentPackage(
   save: SavedPost,
   pairing: Pairing,
+  selectedFormat: ContentFormat,
 ): Promise<Omit<ContentPackage, "id" | "sourceSaveId" | "sourceTitle" | "status" | "platforms" | "createdAt">> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
@@ -83,7 +84,7 @@ export async function generateContentPackage(
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || "gpt-5-mini",
       instructions:
-        "You are Mario Polanco's personal content engine. Mario documents reinvention for men rebuilding after failure, loss, and starting over. Use the saved creator only for delivery DNA. Never transfer the creator's topic, wording, claim, story, identity, examples, or lesson. Use only the supplied Mario-owned source. Be direct, specific, speakable, and participant-level rather than guru-like. Generate 3-5 spoken hooks and 2-3 on-screen hooks. The selected spoken and on-screen hooks must exactly match an option in their respective arrays. Use one or two canonical pillars only: Reinvention, Identity, Standards, Action, Responsibility, Self-Respect, Perspective, or Life Story. Choose exactly one test variable and write a falsifiable hypothesis in the form: If [specific change], then [primary metric] should improve because [audience behavior]. Build a talking skeleton, not a polished full script. Always return cta and caption strings; use an empty string when neither is needed. For Carousel format only, return 2-10 carouselSlides with one screenshot-worthy idea per slide, a repeating visual spine, a payoff, and useful alt text. For every other format, return an empty carouselSlides array. Do not invent facts.",
+        `You are Mario Polanco's personal content engine. Mario documents reinvention for men rebuilding after failure, loss, and starting over. Use the saved creator only for delivery DNA. Never transfer the creator's topic, wording, claim, story, identity, examples, or lesson. Use only the supplied Mario-owned source. The required output format is ${selectedFormat}; return that exact format and adapt only compatible delivery mechanics from the save. Be direct, specific, speakable, and participant-level rather than guru-like. Generate 3-5 spoken hooks and 2-3 on-screen hooks. For non-video formats, spoken hooks are opening-line options and on-screen hooks are cover or first-frame options. The selected spoken and on-screen hooks must exactly match an option in their respective arrays. Use one or two canonical pillars only: Reinvention, Identity, Standards, Action, Responsibility, Self-Respect, Perspective, or Life Story. Choose exactly one test variable and write a falsifiable hypothesis in the form: If [specific change], then [primary metric] should improve because [audience behavior]. For video formats, build a talking skeleton rather than a polished script. For written formats, build an ordered argument outline. Always return cta and caption strings; use an empty string when neither is needed. For Carousel format only, return 2-10 carouselSlides with one screenshot-worthy idea per slide, a repeating visual spine, a payoff, and useful alt text. For every other format, return an empty carouselSlides array. Do not invent facts.`,
       input: JSON.stringify({
         savedDeliveryDna: {
           framework: save.frameworkDna,
@@ -93,6 +94,8 @@ export async function generateContentPackage(
         },
         marioSource: {
           title: pairing.sourceTitle,
+          coreTruth: pairing.coreTruth,
+          storyEvidence: pairing.storyEvidence,
           rationale: pairing.rationale,
           direction: pairing.direction,
           privacyStatus: pairing.privacyStatus,
@@ -114,5 +117,9 @@ export async function generateContentPackage(
   }
 
   const result = await response.json();
-  return contentPackageSchema.parse(parseStructuredJson(result));
+  const generated = contentPackageSchema.parse(parseStructuredJson(result));
+  if (generated.format !== selectedFormat) {
+    throw new Error(`Generation returned ${generated.format} instead of the selected ${selectedFormat} format.`);
+  }
+  return generated;
 }

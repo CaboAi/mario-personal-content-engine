@@ -4,8 +4,11 @@ import { useState } from "react";
 import type {
   BrandSourceInventory,
   CarouselPublication,
+  ContentFormat,
   ContentPackage,
   DashboardData,
+  InstagramAccountDaily,
+  InstagramMediaItem,
   MetricSnapshot,
   Pairing,
   PerformanceReview,
@@ -33,6 +36,21 @@ const productionStatuses: ProductionStatus[] = [
   "Posted",
 ];
 
+const contentFormats: Array<{ id: ContentFormat; label: string; purpose: string }> = [
+  { id: "Yap Reel", label: "Yap Reel", purpose: "Direct argument to camera" },
+  { id: "Mini Story", label: "Mini Story", purpose: "Lived moment with a turn" },
+  { id: "POV / Realization", label: "POV / Realization", purpose: "Observation plus opinion" },
+  { id: "Carousel", label: "Carousel", purpose: "Swipeable visual essay" },
+  { id: "Written Post", label: "Written Post", purpose: "Caption-first argument" },
+  { id: "Long-form", label: "Long-form", purpose: "Deeper structured exploration" },
+];
+
+function suggestedFormat(contentType?: SavedPost["contentType"]): ContentFormat {
+  if (contentType === "Carousel") return "Carousel";
+  if (contentType === "Post") return "Written Post";
+  return "Yap Reel";
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -49,6 +67,9 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [selectedSaveId, setSelectedSaveId] = useState(initialData.saves[0]?.id);
   const [selectedPairingId, setSelectedPairingId] = useState<string | undefined>(
     initialData.saves[0]?.pairings.find((pairing) => pairing.recommended)?.id,
+  );
+  const [selectedFormat, setSelectedFormat] = useState<ContentFormat>(
+    suggestedFormat(initialData.saves[0]?.contentType),
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -82,7 +103,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
         const response = await fetch("/api/pairings/approve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ save: selectedSave, pairing: selectedPairing }),
+          body: JSON.stringify({ save: selectedSave, pairing: selectedPairing, format: selectedFormat }),
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Generation failed.");
@@ -261,6 +282,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
                 save.pairings.find((pairing) => pairing.recommended)?.id ||
                   save.pairings[0]?.id,
               );
+              setSelectedFormat(suggestedFormat(save.contentType));
               setError(null);
               setInspectionNotes(save.inspectionNotes || "");
             }}
@@ -269,6 +291,8 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
               setError(null);
             }}
             onApprove={approveAndGenerate}
+            selectedFormat={selectedFormat}
+            onSelectFormat={setSelectedFormat}
             inspectionNotes={inspectionNotes}
             onInspectionNotesChange={setInspectionNotes}
             onAnalyze={analyzeSave}
@@ -306,6 +330,8 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             content={content}
             metrics={initialData.metrics}
             reviews={initialData.performanceReviews}
+            media={initialData.instagramMedia}
+            accountTrends={initialData.accountTrends}
           />
         )}
 
@@ -415,6 +441,8 @@ function SavesInbox({
   onSelectSave,
   onSelectPairing,
   onApprove,
+  selectedFormat,
+  onSelectFormat,
   inspectionNotes,
   onInspectionNotesChange,
   onAnalyze,
@@ -429,6 +457,8 @@ function SavesInbox({
   onSelectSave: (save: SavedPost) => void;
   onSelectPairing: (pairing: Pairing) => void;
   onApprove: () => void;
+  selectedFormat: ContentFormat;
+  onSelectFormat: (format: ContentFormat) => void;
   inspectionNotes: string;
   onInspectionNotesChange: (value: string) => void;
   onAnalyze: () => void;
@@ -473,14 +503,14 @@ function SavesInbox({
           </a>
         </div>
 
-        {(selectedSave.status === "New" || selectedSave.status === "Blocked") && (
+        {selectedSave.status !== "Used" && (
           <div className="analysis-panel">
             <div>
-              <p className="section-label">Actual-post inspection</p>
-              <h3>Describe only what you can observe</h3>
+              <p className="section-label">Step 1 · Delivery reference</p>
+              <h3>Describe what the saved post does</h3>
               <p>
                 Watch the post, then note the first frame, spoken hook, sequence, cuts,
-                captions, framing, pacing, and CTA. The creator’s topic stays off-limits.
+                captions, framing, pacing, and CTA. This captures mechanics—not their topic.
               </p>
             </div>
             <label>
@@ -498,7 +528,7 @@ function SavesInbox({
               onClick={onAnalyze}
               disabled={isAnalyzing || inspectionNotes.trim().length < 40}
             >
-              {isAnalyzing ? "Analyzing delivery DNA…" : "Analyze save"}
+              {isAnalyzing ? "Ranking Mario sources…" : selectedSave.pairings.length ? "Rerank source options" : "Analyze delivery and find sources"}
             </button>
           </div>
         )}
@@ -520,11 +550,18 @@ function SavesInbox({
 
         {selectedSave.status !== "New" && <div className="pairing-heading">
           <div>
-            <p className="section-label">Mario-owned pairings</p>
-            <h3>Choose the substance</h3>
+            <p className="section-label">Step 2 · Mario-owned source</p>
+            <h3>Choose the story or opinion this post is actually about</h3>
           </div>
-          <span>One source only</span>
+          <span>Choose one verified source</span>
         </div>}
+
+        {selectedSave.status !== "New" && (
+          <div className="source-model" aria-label="How saved references and Mario sources work">
+            <div><span>Saved post contributes</span><strong>Delivery mechanics</strong><p>Hook pattern, sequence, pacing, visual treatment, and CTA placement.</p></div>
+            <div><span>Selected Mario source contributes</span><strong>Substance</strong><p>Your story, evidence, opinion, lesson, and lived point of view.</p></div>
+          </div>
+        )}
 
         <div className="pairing-stack">
           {selectedSave.pairings.map((pairing, index) => (
@@ -540,8 +577,10 @@ function SavesInbox({
                   <strong>{pairing.title}</strong>
                   {pairing.recommended && <span className="recommended">Recommended</span>}
                 </div>
-                <p>{pairing.rationale}</p>
-                <span className="source-name">Source: {pairing.sourceTitle}</span>
+                {pairing.coreTruth && <p className="source-truth"><b>Core truth:</b> {pairing.coreTruth}</p>}
+                {pairing.storyEvidence && <p><b>Known evidence:</b> {pairing.storyEvidence}</p>}
+                <p><b>Why it fits this save:</b> {pairing.rationale}</p>
+                <span className="source-name">Mario source: {pairing.sourceTitle}</span>
               </div>
               <span className={pairing.privacyStatus === "Clear" ? "privacy clear" : "privacy"}>
                 {pairing.privacyStatus}
@@ -557,11 +596,35 @@ function SavesInbox({
         )}
 
         {selectedPairing && (
+          <div className="format-step">
+            <div className="pairing-heading">
+              <div><p className="section-label">Step 3 · Output format</p><h3>Choose what the selected source becomes</h3></div>
+              <span>The source stays the same</span>
+            </div>
+            <p className="format-explainer">This choice controls the deliverable. A saved Reel can become a carousel or written post; only compatible mechanics are adapted.</p>
+            <div className="format-picker" role="radiogroup" aria-label="Content format">
+              {contentFormats.map((format) => (
+                <button
+                  key={format.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedFormat === format.id}
+                  className={selectedFormat === format.id ? "format-option selected" : "format-option"}
+                  onClick={() => onSelectFormat(format.id)}
+                >
+                  <strong>{format.label}</strong><span>{format.purpose}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {selectedPairing && (
           <div className="approval-dock">
             <div>
-              <p className="section-label">Selected direction</p>
+              <p className="section-label">Ready to build · {selectedFormat}</p>
               <strong>{selectedPairing.title}</strong>
-              <span>{selectedPairing.direction}</span>
+              <span><b>Technique to transfer:</b> {selectedPairing.direction}</span>
               {selectedPairing.sourceUrl && (
                 <a href={selectedPairing.sourceUrl} target="_blank" rel="noreferrer">
                   Open source reference
@@ -574,7 +637,7 @@ function SavesInbox({
               onClick={onApprove}
               disabled={isGenerating}
             >
-              {isGenerating ? "Building package…" : "Approve and generate"}
+              {isGenerating ? `Building ${selectedFormat}…` : `Generate ${selectedFormat}`}
             </button>
           </div>
         )}
@@ -632,6 +695,14 @@ function ProductionBoard({
             (hook) => hook !== item.selectedOnScreenHook,
           );
           const statusUpdate = statusUpdates[item.id];
+          const isVideo = item.format === "Yap Reel" || item.format === "Mini Story" || item.format === "POV / Realization";
+          const isCarousel = item.format === "Carousel";
+          const openingLabel = isVideo ? "Recommended spoken hook" : "Recommended opening line";
+          const openingInstruction = isVideo ? "Say this first" : isCarousel ? "Use this as the first-slide thought" : "Open the written piece with this";
+          const visualLabel = isVideo ? "On-screen hook" : isCarousel ? "Carousel cover hook" : "Headline / first-frame hook";
+          const visualInstruction = isVideo ? "Show this text during the opening" : isCarousel ? "Use this on the cover or first slide" : "Use this as the title or visual opener";
+          const bodyLabel = isVideo ? "Talking prompts—not a script" : isCarousel ? "Carousel argument outline" : "Writing outline—not finished prose";
+          const bodyInstruction = isVideo ? "Follow the ideas in order and explain them in your own words" : "Develop these ideas in order while keeping Mario’s exact voice";
 
           return <article className="production-item" key={item.id}>
             <div className="production-meta">
@@ -642,20 +713,20 @@ function ProductionBoard({
             <h2>{item.title}</h2>
             <div className="selected-hooks" aria-label="Selected opening">
               <div className="selected-hook spoken">
-                <p className="section-label">Recommended spoken hook</p>
-                <span className="instruction">Say this first</span>
+                <p className="section-label">{openingLabel}</p>
+                <span className="instruction">{openingInstruction}</span>
                 <blockquote>{item.selectedHook}</blockquote>
               </div>
               <div className="selected-hook on-screen">
-                <p className="section-label">On-screen hook</p>
-                <span className="instruction">Show this text during the opening</span>
+                <p className="section-label">{visualLabel}</p>
+                <span className="instruction">{visualInstruction}</span>
                 <strong>{item.selectedOnScreenHook}</strong>
               </div>
             </div>
             <div className="production-sections">
               <section className="production-section alternatives">
                 <div>
-                  <p className="section-label">Alternative spoken hooks</p>
+                  <p className="section-label">{isVideo ? "Alternative spoken hooks" : "Alternative opening lines"}</p>
                   <span className="instruction">Use one of these instead only when testing the opener</span>
                   {alternativeSpokenHooks.length > 0 ? (
                     <ol>
@@ -664,7 +735,7 @@ function ProductionBoard({
                   ) : <p className="empty-option">No alternatives generated.</p>}
                 </div>
                 <div>
-                  <p className="section-label">Alternative on-screen hooks</p>
+                  <p className="section-label">{isVideo ? "Alternative on-screen hooks" : "Alternative visual hooks"}</p>
                   <span className="instruction">Optional visual opener variants</span>
                   {alternativeOnScreenHooks.length > 0 ? (
                     <ol>
@@ -674,12 +745,12 @@ function ProductionBoard({
                 </div>
               </section>
               <section className="production-section talking-prompts">
-                <p className="section-label">Talking prompts—not a script</p>
-                <span className="instruction">Follow the ideas in order and explain them in your own words</span>
+                <p className="section-label">{bodyLabel}</p>
+                <span className="instruction">{bodyInstruction}</span>
                 <ol>
                   {item.skeleton.map((beat) => <li key={beat}>{beat}</li>)}
                 </ol>
-                <p className="riff-note">Hit record and riff on this. If it sounds polished, restart.</p>
+                <p className="riff-note">{isVideo ? "Hit record and riff on this. If it sounds polished, restart." : "Use the sequence as scaffolding; keep the final language specific, direct, and unmistakably Mario."}</p>
               </section>
             </div>
             <div className="hypothesis">
@@ -707,8 +778,8 @@ function ProductionBoard({
             )}
             <div className="production-footer">
               <div className="closing-block">
-                <span>Final spoken line</span>
-                <small>Say this last, then stop unless an optional CTA appears below.</small>
+                <span>{isVideo ? "Final spoken line" : isCarousel ? "Final slide line" : "Final written line"}</span>
+                <small>{isVideo ? "Say this last, then stop unless an optional CTA appears below." : "End here unless an optional CTA appears below."}</small>
                 <strong>{item.closingLine}</strong>
                 {item.cta && (
                   <div className="optional-cta">
@@ -980,15 +1051,35 @@ function PerformanceLab({
   content,
   metrics,
   reviews,
+  media,
+  accountTrends,
 }: {
   connected: boolean;
   content: ContentPackage[];
   metrics: MetricSnapshot[];
   reviews: PerformanceReview[];
+  media: InstagramMediaItem[];
+  accountTrends: InstagramAccountDaily[];
 }) {
   const [refreshing, setRefreshing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [mediaItems, setMediaItems] = useState(media);
   const linked = content.filter((item) => item.instagramMediaId);
+  const recentTrends = accountTrends.slice(-30);
+  const sumTrend = (key: "reach" | "views" | "profileViews" | "followerCount") => {
+    const values = recentTrends.map((day) => day[key]).filter((value): value is number => typeof value === "number");
+    return values.length ? values.reduce((sum, value) => sum + value, 0) : undefined;
+  };
+  const totalReach = sumTrend("reach");
+  const totalViews = sumTrend("views");
+  const profileViews = sumTrend("profileViews");
+  const newFollowers = sumTrend("followerCount");
+  const topBy = (key: "views" | "shares" | "saves") =>
+    [...mediaItems].filter((item) => typeof item[key] === "number").sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0))[0];
+  const topViewed = topBy("views");
+  const topShared = topBy("shares");
+  const topSaved = topBy("saves");
 
   async function refreshInsights() {
     setRefreshing(true);
@@ -1006,34 +1097,190 @@ function PerformanceLab({
     }
   }
 
+  async function importHistory() {
+    setImporting(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/instagram/import", { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Instagram history import failed.");
+      setMessage(`Imported ${result.importedPosts} existing post(s), with insights on ${result.postsWithInsights}; ${result.accountDays} account-trend day(s). Reloading…`);
+      window.setTimeout(() => window.location.reload(), 800);
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Instagram history import failed.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
-    <section className="performance-layout stagger-in">
-      <div className="performance-lead">
-        <p className="section-label">Instagram account insights</p>
-        <h2>{connected ? "Analytics connection active" : "Connect Meta to begin the baseline"}</h2>
-        <p>
-          Each linked post is reviewed at the same 24-hour and 7-day windows. Meta can lag by
-          up to 48 hours, so unavailable values stay blank and retry later instead of becoming zero.
-        </p>
-        <button type="button" className="secondary-action" disabled={!connected || refreshing} onClick={() => void refreshInsights()}>
-          {refreshing ? "Refreshing…" : connected ? "Refresh due windows" : "Meta connection required"}
-        </button>
-        {message && <p className="operation-message" role="status">{message}</p>}
+    <section className="performance-hub stagger-in">
+      <div className="performance-intro">
+        <div>
+          <p className="section-label">Instagram evidence system</p>
+          <h2>{connected ? "Your baseline, experiments, and patterns—in one place" : "Connect Meta to build the evidence layer"}</h2>
+          <p>Existing posts establish the historical baseline. Dashboard posts add controlled 24-hour and 7-day experiments. Edits retention diagnostics explain what happened inside each Reel.</p>
+        </div>
+        <div className="performance-actions">
+          <button type="button" className="primary-action" disabled={!connected || importing} onClick={() => void importHistory()}>
+            {importing ? "Importing Instagram history…" : mediaItems.length ? "Sync existing posts" : "Import existing posts"}
+          </button>
+          <button type="button" className="secondary-action" disabled={!connected || refreshing} onClick={() => void refreshInsights()}>
+            {refreshing ? "Refreshing experiments…" : "Refresh due experiment windows"}
+          </button>
+          {message && <p className="operation-message" role="status">{message}</p>}
+        </div>
       </div>
-      <div className="performance-stack">
+
+      <nav className="performance-nav" aria-label="Performance sections">
+        <a href="#account-trends">Account trends</a>
+        <a href="#existing-posts">Existing posts library</a>
+        <a href="#dashboard-experiments">Dashboard experiments</a>
+        <a href="#winners-patterns">Winners and patterns</a>
+      </nav>
+
+      <section className="performance-section" id="account-trends">
+        <div className="section-heading-wide"><div><p className="section-label">01 · Account trends</p><h2>What the account is doing over time</h2></div><span>Last 30 imported days</span></div>
+        <div className="trend-layout">
+          <div className="trend-metrics">
+            <TrendMetric label="Reach" value={totalReach} />
+            <TrendMetric label="Views" value={totalViews} />
+            <TrendMetric label="Profile views" value={profileViews} />
+            <TrendMetric label="New followers" value={newFollowers} />
+          </div>
+          <AccountTrendChart trends={recentTrends} />
+        </div>
+        {!recentTrends.length && <div className="performance-empty">Run “Import existing posts” to request the account-level history Meta makes available. Missing days remain blank, never zero-filled.</div>}
+      </section>
+
+      <section className="performance-section" id="existing-posts">
+        <div className="section-heading-wide"><div><p className="section-label">02 · Existing posts library</p><h2>Your published baseline</h2><p>Current lifetime totals imported from Instagram. These are useful for ranking your existing work, but they are not retroactive 24-hour or 7-day snapshots.</p></div><span>{mediaItems.length} imported</span></div>
+        <div className="media-library">
+          {mediaItems.length ? mediaItems.map((item) => (
+            <ExistingPost key={item.id} item={item} onUpdate={(updated) => setMediaItems((items) => items.map((candidate) => candidate.id === updated.id ? updated : candidate))} />
+          )) : <div className="performance-empty">No existing Instagram posts have been imported yet.</div>}
+        </div>
+      </section>
+
+      <section className="performance-section" id="dashboard-experiments">
+        <div className="section-heading-wide"><div><p className="section-label">03 · Dashboard experiments</p><h2>Comparable review windows</h2><p>Only posts linked from Production belong here. They are evaluated at the same elapsed time so hook, format, CTA, and visual tests stay interpretable.</p></div><span>{linked.length} linked</span></div>
         <div className="performance-summary">
           <Metric value={linked.length} label="Linked posts" />
           <Metric value={reviews.filter((review) => review.status === "Pending").length} label="Windows pending" />
           <Metric value={reviews.filter((review) => review.status === "Complete").length} label="Windows complete" />
         </div>
-        {linked.length === 0 ? (
-          <div className="performance-empty">Link an Instagram Media ID from Production after a post goes live.</div>
-        ) : linked.map((item) => (
-          <PerformanceCard key={item.id} item={item} metrics={metrics} reviews={reviews} />
-        ))}
-      </div>
+        <div className="performance-stack">
+          {linked.length === 0 ? <div className="performance-empty">After a dashboard-made post goes live, link its Instagram Media ID in Production to begin controlled review windows.</div> : linked.map((item) => (
+            <PerformanceCard key={item.id} item={item} metrics={metrics} reviews={reviews} />
+          ))}
+        </div>
+      </section>
+
+      <section className="performance-section" id="winners-patterns">
+        <div className="section-heading-wide"><div><p className="section-label">04 · Winners and patterns</p><h2>Signals worth repeating—not premature rules</h2><p>A single high performer is an observation. A repeatable pattern requires comparable posts and repeated evidence.</p></div><span>{mediaItems.length + linked.length} evidence items</span></div>
+        <div className="pattern-ledger">
+          <PatternSignal label="Attention" item={topViewed} metric="views" />
+          <PatternSignal label="Distribution" item={topShared} metric="shares" />
+          <PatternSignal label="Resonance" item={topSaved} metric="saves" />
+          <article className="retention-framework">
+            <p className="section-label">Reel diagnostic framework</p>
+            <h3>Hook → pacing → rewatch → outro</h3>
+            <ol>
+              <li><strong>First 3 seconds:</strong> log Edits hook/skip rate; use 60–70% retention as a working target, then replace it with your own baseline.</li>
+              <li><strong>Mid-video dips:</strong> identify the exact pause, repetition, transition, or confusing line.</li>
+              <li><strong>Spikes:</strong> note text or details that caused a rewatch and deliberately test the mechanic again.</li>
+              <li><strong>End drop:</strong> remove announced outros and place the payoff against the final frame.</li>
+            </ol>
+          </article>
+        </div>
+      </section>
     </section>
   );
+}
+
+function TrendMetric({ label, value }: { label: string; value?: number }) {
+  return <div className="trend-metric"><span>{label}</span><strong>{value === undefined ? "—" : value.toLocaleString()}</strong></div>;
+}
+
+function AccountTrendChart({ trends }: { trends: InstagramAccountDaily[] }) {
+  const values = trends.map((day) => day.reach).filter((value): value is number => typeof value === "number");
+  if (values.length < 2) return <div className="trend-chart empty"><span>Daily reach chart appears after Meta returns at least two dated values.</span></div>;
+  const max = Math.max(...values, 1);
+  const points = values.map((value, index) => `${(index / Math.max(values.length - 1, 1)) * 100},${46 - (value / max) * 42}`).join(" ");
+  return <div className="trend-chart"><div><span>Daily reach</span><small>Imported account series</small></div><svg viewBox="0 0 100 48" role="img" aria-label="Daily Instagram reach trend"><polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.6" vectorEffect="non-scaling-stroke" /></svg></div>;
+}
+
+function mediaLabel(item: InstagramMediaItem) {
+  const caption = item.caption?.trim();
+  return caption ? caption.split(/\s+/).slice(0, 12).join(" ") : `${item.mediaProductType || item.mediaType || "Instagram"} post`;
+}
+
+function ExistingPost({ item, onUpdate }: { item: InstagramMediaItem; onUpdate: (item: InstagramMediaItem) => void }) {
+  return (
+    <article className="media-row">
+      <div className="media-identity">
+        <span>{item.mediaProductType || item.mediaType || "POST"} · {formatDate(item.postedAt)}</span>
+        <strong>{mediaLabel(item)}</strong>
+        {item.permalink && <a href={item.permalink} target="_blank" rel="noreferrer">Open on Instagram</a>}
+      </div>
+      <div className="media-metrics">
+        <TrendMetric label="Views" value={item.views} /><TrendMetric label="Reach" value={item.reach} />
+        <TrendMetric label="Shares" value={item.shares} /><TrendMetric label="Saves" value={item.saves} />
+      </div>
+      {(item.mediaProductType?.toUpperCase() === "REELS" || item.mediaType?.toUpperCase() === "VIDEO") && <EditsDiagnostics item={item} onUpdate={onUpdate} />}
+    </article>
+  );
+}
+
+function optionalPercent(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function EditsDiagnostics({ item, onUpdate }: { item: InstagramMediaItem; onUpdate: (item: InstagramMediaItem) => void }) {
+  const [open, setOpen] = useState(Boolean(item.editsUpdatedAt));
+  const [hookRate, setHookRate] = useState(item.hookRate?.toString() ?? "");
+  const [skipRate, setSkipRate] = useState(item.skipRate?.toString() ?? "");
+  const [followerShare, setFollowerShare] = useState(item.followerViewPercentage?.toString() ?? "");
+  const [nonFollowerShare, setNonFollowerShare] = useState(item.nonFollowerViewPercentage?.toString() ?? "");
+  const [notes, setNotes] = useState(item.retentionNotes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true); setMessage(null);
+    try {
+      const response = await fetch(`/api/instagram/media/${encodeURIComponent(item.instagramMediaId)}/diagnostics`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hookRate: optionalPercent(hookRate), skipRate: optionalPercent(skipRate), followerViewPercentage: optionalPercent(followerShare), nonFollowerViewPercentage: optionalPercent(nonFollowerShare), retentionNotes: notes }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Edits diagnostics could not be saved.");
+      onUpdate(result.media); setMessage("Edits diagnostics saved.");
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Edits diagnostics could not be saved."); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="edits-diagnostics">
+      <button type="button" className="text-action" onClick={() => setOpen((value) => !value)}>{open ? "Hide Edits diagnostics" : item.editsUpdatedAt ? "Review Edits diagnostics" : "Add Edits retention diagnostics"}</button>
+      {open && <div className="edits-form">
+        <p>Meta imports standard totals automatically. Enter Edits-only retention evidence here—never estimate it from views.</p>
+        <label><span>Hook rate %</span><input type="number" min="0" max="100" step="0.1" value={hookRate} onChange={(event) => setHookRate(event.target.value)} /></label>
+        <label><span>Skip rate %</span><input type="number" min="0" max="100" step="0.1" value={skipRate} onChange={(event) => setSkipRate(event.target.value)} /></label>
+        <label><span>Follower views %</span><input type="number" min="0" max="100" step="0.1" value={followerShare} onChange={(event) => setFollowerShare(event.target.value)} /></label>
+        <label><span>Non-follower views %</span><input type="number" min="0" max="100" step="0.1" value={nonFollowerShare} onChange={(event) => setNonFollowerShare(event.target.value)} /></label>
+        <label className="retention-notes"><span>Retention graph notes</span><textarea rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="0–3s shape… exact mid-video dip… rewatch spike… pre-end drop…" /></label>
+        <button type="button" className="secondary-action" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save Edits diagnostics"}</button>
+        {message && <small>{message}</small>}
+      </div>}
+    </div>
+  );
+}
+
+function PatternSignal({ label, item, metric }: { label: string; item?: InstagramMediaItem; metric: "views" | "shares" | "saves" }) {
+  return <article className="pattern-signal"><p className="section-label">{label}</p>{item ? <><strong>{mediaLabel(item)}</strong><span>{(item[metric] ?? 0).toLocaleString()} {metric}</span><small>Current historical leader. Treat as an observation until a comparable post repeats the result.</small></> : <span>No imported evidence yet.</span>}</article>;
 }
 
 function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {

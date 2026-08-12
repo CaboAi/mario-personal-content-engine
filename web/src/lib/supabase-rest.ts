@@ -47,7 +47,7 @@ export async function supabaseRequest<T>(
 export async function getDashboardData(): Promise<DashboardData> {
   if (!isLiveMode()) return demoData;
 
-  const [saves, content, metrics, sources, performanceReviews, publications] = await Promise.all([
+  const [saves, content, metrics, sources, performanceReviews, publications, instagramMedia, accountTrends] = await Promise.all([
     supabaseRequest<DashboardData["saves"]>(
       "dashboard_saved_posts?select=*&order=savedAt.desc",
     ),
@@ -66,6 +66,12 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabaseRequest<DashboardData["publications"]>(
       "dashboard_carousel_publications?select=*&order=updatedAt.desc",
     ),
+    supabaseRequest<DashboardData["instagramMedia"]>(
+      "dashboard_instagram_media?select=*&order=postedAt.desc",
+    ),
+    supabaseRequest<DashboardData["accountTrends"]>(
+      "dashboard_instagram_account_daily?select=*&order=metricDate.asc",
+    ),
   ]);
 
   return {
@@ -75,6 +81,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     sources,
     performanceReviews,
     publications,
+    instagramMedia,
+    accountTrends,
     analyticsConnected: Boolean(process.env.META_ACCESS_TOKEN && process.env.META_INSTAGRAM_ACCOUNT_ID),
     publishingConnected: Boolean(process.env.META_ACCESS_TOKEN && process.env.META_INSTAGRAM_ACCOUNT_ID),
     liveMode: true,

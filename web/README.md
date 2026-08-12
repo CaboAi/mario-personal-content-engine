@@ -28,16 +28,20 @@ The complete environment-variable checklist, deployment flow, local bridge hando
 
 ## Workflow
 
-`Instagram Save → actual-post inspection → delivery-DNA analysis → approve Mario source → Production → publish/link → 24-hour + 7-day review`
+`Instagram Save → inspect delivery mechanics → choose one Mario source → choose output format → Production → publish/link → 24-hour + 7-day review`
 
 Saved posts contribute delivery DNA only. A verified Mario source supplies the story, opinion, and lesson.
 Analysis intentionally requires human-observed notes from the actual post; a Reel or Carousel is never analyzed from its caption alone.
+The source and format are separate decisions: the selected source controls what the post is about; the selected format controls whether it becomes a Yap Reel, Mini Story, POV / Realization, Carousel, Written Post, or Long-form package.
 
 Verified Mario-owned source material is copied into Supabase with `pnpm seed:sources`.
 The seed is idempotent and the dashboard does not read Notion during analysis or generation.
 
 ## Performance and publishing
 
+- The authenticated **Import existing posts** action imports Mario's published Instagram media, available lifetime media insights, and up to 90 days of available account-level series into Supabase. Re-running it is idempotent.
+- Performance is separated into account trends, the existing-post baseline, dashboard experiments, and winners/patterns. Historical lifetime totals are never presented as retroactive 24-hour or 7-day snapshots.
+- Edits-only Reel diagnostics—hook rate, skip rate, follower/non-follower split, and retention-curve notes—are entered manually per imported Reel. The dashboard does not infer them from views or average watch time.
 - A manually published post can be linked by Instagram Media ID from Production. This schedules comparable 24-hour and 7-day review windows.
 - The daily Vercel job captures due owned-media insights once Meta is configured. Missing Meta values remain unavailable and retry later; they are never converted to zero.
 - A signal needs at least five comparable same-goal, same-window posts. A signal is a comparison, not a winner declaration or a durable brand learning.

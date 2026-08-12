@@ -14,14 +14,26 @@ export type ProductionStatus =
   | "Scheduled"
   | "Posted";
 
+export type ContentFormat =
+  | "Yap Reel"
+  | "Mini Story"
+  | "POV / Realization"
+  | "Carousel"
+  | "Written Post"
+  | "Long-form";
+
 export type Pairing = {
   id: string;
+  brandSourceId?: string;
   title: string;
   sourceType: "Story" | "Daily Entry" | "Existing Content";
   sourceTitle: string;
   sourceUrl?: string;
   rationale: string;
   direction: string;
+  coreTruth?: string;
+  storyEvidence?: string;
+  pillars?: string[];
   privacyStatus: "Clear" | "Needs confirmation";
   recommended?: boolean;
 };
@@ -72,7 +84,7 @@ export type ContentPackage = {
   title: string;
   sourceSaveId?: string;
   sourceTitle: string;
-  format: "Yap Reel" | "Mini Story" | "POV / Realization" | "Carousel" | "Written Post" | "Long-form";
+  format: ContentFormat;
   goal: "Reach" | "Shares" | "Saves" | "Follows" | "Trust";
   pillars: string[];
   status: ProductionStatus;
@@ -141,6 +153,52 @@ export type CarouselPublication = {
   updatedAt: string;
 };
 
+export type InstagramMediaItem = {
+  id: string;
+  instagramMediaId: string;
+  contentId?: string;
+  caption?: string;
+  mediaType?: string;
+  mediaProductType?: string;
+  permalink?: string;
+  thumbnailUrl?: string;
+  postedAt: string;
+  views?: number;
+  reach?: number;
+  averageWatchSeconds?: number;
+  totalWatchSeconds?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  follows?: number;
+  totalInteractions?: number;
+  reposts?: number;
+  hookRate?: number;
+  skipRate?: number;
+  followerViewPercentage?: number;
+  nonFollowerViewPercentage?: number;
+  retentionNotes?: string;
+  retentionCurve?: Array<{ second: number; retention: number }>;
+  lastSyncedAt: string;
+  editsUpdatedAt?: string;
+};
+
+export type InstagramAccountDaily = {
+  metricDate: string;
+  reach?: number;
+  views?: number;
+  profileViews?: number;
+  followerCount?: number;
+  accountsEngaged?: number;
+  totalInteractions?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  lastSyncedAt: string;
+};
+
 export type DashboardData = {
   saves: SavedPost[];
   content: ContentPackage[];
@@ -148,6 +206,8 @@ export type DashboardData = {
   sources: BrandSourceInventory[];
   performanceReviews: PerformanceReview[];
   publications: CarouselPublication[];
+  instagramMedia: InstagramMediaItem[];
+  accountTrends: InstagramAccountDaily[];
   analyticsConnected: boolean;
   publishingConnected: boolean;
   liveMode: boolean;

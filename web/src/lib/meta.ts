@@ -19,14 +19,14 @@ export function isMetaConfigured() {
 }
 
 export function getMetaConfig(): MetaConfig {
-  const accessToken = process.env.META_ACCESS_TOKEN;
-  const accountId = process.env.META_INSTAGRAM_ACCOUNT_ID;
+  const accessToken = process.env.META_ACCESS_TOKEN?.trim();
+  const accountId = process.env.META_INSTAGRAM_ACCOUNT_ID?.trim();
   if (!accessToken || !accountId) {
     throw new Error("Meta requires META_ACCESS_TOKEN and META_INSTAGRAM_ACCOUNT_ID.");
   }
-  const baseUrl = (process.env.META_GRAPH_BASE_URL || "https://graph.instagram.com").replace(/\/$/, "");
+  const baseUrl = (process.env.META_GRAPH_BASE_URL || "https://graph.instagram.com").trim().replace(/\/+$/, "");
   if (!ALLOWED_GRAPH_HOSTS.has(baseUrl)) throw new Error("Unsupported Meta Graph host.");
-  const version = process.env.META_GRAPH_API_VERSION || DEFAULT_GRAPH_VERSION;
+  const version = (process.env.META_GRAPH_API_VERSION || DEFAULT_GRAPH_VERSION).trim();
   if (!/^v\d+\.\d+$/.test(version)) throw new Error("Invalid Meta Graph API version.");
   return { accessToken, accountId, baseUrl, version };
 }
@@ -78,6 +78,100 @@ export async function fetchInstagramMedia(mediaId: string) {
     permalink?: string;
     timestamp?: string;
   }>(`${encodeURIComponent(mediaId)}?fields=id,media_type,media_product_type,permalink,timestamp`);
+}
+
+export type InstagramMediaRecord = {
+  id: string;
+  caption?: string;
+  media_type?: string;
+  media_product_type?: string;
+  permalink?: string;
+  thumbnail_url?: string;
+  timestamp: string;
+};
+
+export async function listInstagramMedia(maxItems = 100) {
+  const { accountId } = getMetaConfig();
+  const media: InstagramMediaRecord[] = [];
+  let after: string | undefined;
+  do {
+    const query = new URLSearchParams({
+      fields: "id,media_type,media_product_type,permalink,timestamp",
+      limit: String(Math.min(50, maxItems - media.length)),
+    });
+    if (after) query.set("after", after);
+    const page = await metaRequest<{
+      data?: InstagramMediaRecord[];
+      paging?: { cursors?: { after?: string }; next?: string };
+    }>(`${encodeURIComponent(accountId)}/media?${query}`);
+    media.push(...(page.data ?? []));
+    after = page.paging?.next ? page.paging.cursors?.after : undefined;
+  } while (after && media.length < maxItems);
+  return media.slice(0, maxItems);
+}
+
+export type AccountDailyMetrics = {
+  metricDate: string;
+  reach?: number;
+  views?: number;
+  profileViews?: number;
+  followerCount?: number;
+  accountsEngaged?: number;
+  totalInteractions?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  rawMetrics: Record<string, number>;
+};
+
+const accountMetricNames = [
+  "reach",
+  "views",
+  "profile_views",
+  "follower_count",
+  "accounts_engaged",
+  "total_interactions",
+  "likes",
+  "comments",
+  "shares",
+  "saves",
+] as const;
+
+export async function fetchAccountDailyInsights(days = 90) {
+  const { accountId } = getMetaConfig();
+  const until = Math.floor(Date.now() / 1_000);
+  const since = until - Math.min(Math.max(days, 1), 90) * 86_400;
+  const settled = await Promise.allSettled(accountMetricNames.map(async (metric) => {
+    const query = new URLSearchParams({ metric, period: "day", since: String(since), until: String(until) });
+    const response = await metaRequest<{
+      data?: Array<{ name: string; values?: Array<{ value?: number; end_time?: string }> }>;
+    }>(`${encodeURIComponent(accountId)}/insights?${query}`);
+    return { metric, values: response.data?.[0]?.values ?? [] };
+  }));
+
+  const byDate = new Map<string, AccountDailyMetrics>();
+  for (const result of settled) {
+    if (result.status !== "fulfilled") continue;
+    for (const point of result.value.values) {
+      if (typeof point.value !== "number" || !Number.isFinite(point.value) || !point.end_time) continue;
+      const metricDate = point.end_time.slice(0, 10);
+      const row = byDate.get(metricDate) ?? { metricDate, rawMetrics: {} };
+      row.rawMetrics[result.value.metric] = point.value;
+      if (result.value.metric === "reach") row.reach = point.value;
+      if (result.value.metric === "views") row.views = point.value;
+      if (result.value.metric === "profile_views") row.profileViews = point.value;
+      if (result.value.metric === "follower_count") row.followerCount = point.value;
+      if (result.value.metric === "accounts_engaged") row.accountsEngaged = point.value;
+      if (result.value.metric === "total_interactions") row.totalInteractions = point.value;
+      if (result.value.metric === "likes") row.likes = point.value;
+      if (result.value.metric === "comments") row.comments = point.value;
+      if (result.value.metric === "shares") row.shares = point.value;
+      if (result.value.metric === "saves") row.saves = point.value;
+      byDate.set(metricDate, row);
+    }
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.metricDate.localeCompare(b.metricDate));
 }
 
 export async function getPublishingLimit() {

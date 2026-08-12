@@ -41,7 +41,12 @@ export async function POST(request: Request) {
     story_evidence: string; privacy_status: BrandSource["privacyStatus"]; pillars: string[];
     source_url?: string; status: string;
   }>>("brand_sources?status=eq.Verified&privacy_status=eq.Clear&select=*&order=created_at.desc&limit=50");
-  const sources: BrandSource[] = sourceRows.map((source) => ({
+  const recommendationRows = await supabaseRequest<Array<{
+    brand_source_id: string; recommended: boolean; created_at: string;
+  }>>("pairings?select=brand_source_id,recommended,created_at&order=created_at.desc&limit=200");
+  const sources: Array<BrandSource & { usageCount: number; recommendationCount: number; recentlyRecommended: boolean }> = sourceRows.map((source) => {
+    const history = recommendationRows.filter((pairing) => pairing.brand_source_id === source.id);
+    return ({
     id: source.id,
     sourceType: source.source_type,
     title: source.title,
@@ -50,7 +55,11 @@ export async function POST(request: Request) {
     privacyStatus: source.privacy_status,
     pillars: source.pillars,
     sourceUrl: source.source_url,
-  }));
+    usageCount: history.length,
+    recommendationCount: history.filter((pairing) => pairing.recommended).length,
+    recentlyRecommended: history.some((pairing) => pairing.recommended && Date.now() - new Date(pairing.created_at).getTime() < 14 * 86_400_000),
+  });
+  });
   if (!sources.length) {
     return NextResponse.json({ error: "No Clear and Verified Mario-owned sources are available." }, { status: 409 });
   }

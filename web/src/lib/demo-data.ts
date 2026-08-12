@@ -108,6 +108,8 @@ export const demoData: DashboardData = {
   sources: [],
   performanceReviews: [],
   publications: [],
+  instagramMedia: [],
+  accountTrends: [],
   analyticsConnected: false,
   publishingConnected: false,
   liveMode: false,

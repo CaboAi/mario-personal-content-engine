@@ -61,6 +61,10 @@ describe("Production package instructions", () => {
     fireEvent.click(screen.getByRole("button", { name: /Production/ }));
 
     expect(screen.getByText("Carousel publisher")).toBeTruthy();
+    expect(screen.getByText("Recommended opening line")).toBeTruthy();
+    expect(screen.getByText("Carousel cover hook")).toBeTruthy();
+    expect(screen.getByText("Carousel argument outline")).toBeTruthy();
+    expect(screen.getByText("Final slide line")).toBeTruthy();
     expect(screen.getByText(/Nothing is sent to Meta/)).toBeTruthy();
     expect(
       (screen.getByRole("button", { name: "Connect Meta to publish" }) as HTMLButtonElement).disabled,
@@ -91,5 +95,31 @@ describe("Live brand source inventory", () => {
     expect(screen.getByText("Live source inventory")).toBeTruthy();
     expect(screen.getByText("Rebuilt after the reset")).toBeTruthy();
     expect(screen.getByText("2 production uses")).toBeTruthy();
+  });
+});
+
+describe("Save source and format decisions", () => {
+  it("separates delivery mechanics, Mario substance, and output format", () => {
+    render(<Workspace initialData={demoData} />);
+    fireEvent.click(screen.getByRole("button", { name: /Saves Inbox/ }));
+
+    expect(screen.getByText("Saved post contributes")).toBeTruthy();
+    expect(screen.getByText("Selected Mario source contributes")).toBeTruthy();
+    expect(screen.getByText("Choose the story or opinion this post is actually about")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Carousel/ })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Written Post/ })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Long-form/ })).toBeTruthy();
+  });
+});
+
+describe("Performance evidence architecture", () => {
+  it("exposes the four distinct analytics layers", () => {
+    render(<Workspace initialData={demoData} />);
+    fireEvent.click(screen.getByRole("button", { name: /Performance/ }));
+
+    expect(screen.getByText("What the account is doing over time")).toBeTruthy();
+    expect(screen.getByText("Your published baseline")).toBeTruthy();
+    expect(screen.getByText("Comparable review windows")).toBeTruthy();
+    expect(screen.getByText("Signals worth repeating—not premature rules")).toBeTruthy();
   });
 });
