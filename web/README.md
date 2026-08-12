@@ -6,7 +6,7 @@ Private Next.js dashboard for Mario's saved-post review, brand-safe content gene
 
 1. Copy `.env.example` to `.env.local`.
 2. Add a dashboard password and a long random session secret.
-3. Run the Supabase migration in `supabase/migrations/0001_content_engine.sql`.
+3. Apply every migration in `supabase/migrations/` in numeric order.
 4. Add the Supabase URL, server secret key, OpenAI API key, and ingestion secret.
 5. Run `npm run dev`.
 
@@ -28,10 +28,18 @@ The complete environment-variable checklist, deployment flow, local bridge hando
 
 ## Workflow
 
-`Instagram Save → New → actual-post inspection → delivery-DNA analysis → Needs Review → Approve and generate → Script Ready → Production → Metrics`
+`Instagram Save → actual-post inspection → delivery-DNA analysis → approve Mario source → Production → publish/link → 24-hour + 7-day review`
 
 Saved posts contribute delivery DNA only. A verified Mario source supplies the story, opinion, and lesson.
 Analysis intentionally requires human-observed notes from the actual post; a Reel or Carousel is never analyzed from its caption alone.
 
 Verified Mario-owned source material is copied into Supabase with `pnpm seed:sources`.
 The seed is idempotent and the dashboard does not read Notion during analysis or generation.
+
+## Performance and publishing
+
+- A manually published post can be linked by Instagram Media ID from Production. This schedules comparable 24-hour and 7-day review windows.
+- The daily Vercel job captures due owned-media insights once Meta is configured. Missing Meta values remain unavailable and retry later; they are never converted to zero.
+- A signal needs at least five comparable same-goal, same-window posts. A signal is a comparison, not a winner declaration or a durable brand learning.
+- Carousel publishing requires 2–10 public HTTPS JPEG assets, matching alt text, validation, a human review checkbox, and an explicit publish click. The scheduler never publishes content automatically.
+- The Brand System reads its live source inventory directly from Supabase. Notion is not required.

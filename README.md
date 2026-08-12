@@ -2,7 +2,7 @@
 
 Instagram-first content operating system for [`@mario_polancojr`](https://www.instagram.com/mario_polancojr/).
 
-The engine turns Mario's lived observations into differentiated personal-brand content, moves each piece through the existing Notion production system, and feeds real performance learnings back into future hooks and formats.
+The engine turns Mario's lived observations into differentiated personal-brand content, moves each piece through the private dashboard production system, and feeds comparable Instagram evidence into future hooks and formats.
 
 ## Core loop
 
@@ -13,9 +13,9 @@ The engine turns Mario's lived observations into differentiated personal-brand c
 5. Build one script around one idea.
 6. Batch writing, recording, editing, and scheduling.
 7. Publish on Instagram first; repurpose selectively.
-8. Log performance in Notion.
-9. Identify winners and outliers at the batch level.
-10. Feed one clear learning into the next batch.
+8. Capture owned-media performance at fixed 24-hour and 7-day windows.
+9. Compare same-goal, same-window evidence at the batch level.
+10. Promote a durable learning only after repeated controlled evidence.
 
 ## Architecture
 
@@ -34,6 +34,8 @@ The private dashboard is live at `https://mario-personal-content-engine.vercel.a
 The local bridge writes normalized saves to the dashboard without sending Instagram cookies to the cloud; Notion is an optional independent mirror. The canonical `MarioPersonalInstagramSavesSync` Windows task runs at 9 AM and 9 PM and supports the configured collection, including a local-filter fallback when Instagram's direct collection feed returns 404.
 
 The live deployment checklist is in [`docs/VERCEL_DEPLOYMENT.md`](docs/VERCEL_DEPLOYMENT.md). Vercel must use `web` as the Root Directory; production secrets are configured in Vercel and remain out of the repository.
+
+The dashboard now includes live Supabase source inventory, fixed-window Meta insight capture, manual post linking, and a review-gated carousel publisher. Notion remains an optional mirror and is not required for dashboard operation.
 
 ## Non-negotiable rule
 

@@ -55,6 +55,18 @@ export type BrandSource = {
   sourceUrl?: string;
 };
 
+export type BrandSourceInventory = BrandSource & {
+  status: "Captured" | "Verified" | "Used" | "Retired";
+  updatedAt: string;
+  usageCount: number;
+};
+
+export type CarouselSlide = {
+  headline: string;
+  body: string;
+  altText: string;
+};
+
 export type ContentPackage = {
   id: string;
   title: string;
@@ -73,6 +85,12 @@ export type ContentPackage = {
   skeleton: string[];
   closingLine: string;
   cta?: string;
+  caption?: string;
+  carouselSlides: CarouselSlide[];
+  instagramMediaId?: string;
+  instagramPermalink?: string;
+  mediaProductType?: string;
+  postDate?: string;
   platforms: string[];
   createdAt: string;
 };
@@ -89,12 +107,48 @@ export type MetricSnapshot = {
   shares?: number;
   saves?: number;
   follows?: number;
+  mediaProductType?: string;
+};
+
+export type PerformanceReview = {
+  id: string;
+  contentId: string;
+  reviewWindowHours: 24 | 168;
+  dueAt: string;
+  status: "Pending" | "Complete" | "Failed";
+  primaryMetric?: string;
+  primaryValue?: number;
+  comparableCount: number;
+  signal?: string;
+  observation?: string;
+  nextTest?: string;
+  analyzedAt?: string;
+  lastError?: string;
+};
+
+export type CarouselPublication = {
+  id: string;
+  contentId: string;
+  status: "Draft" | "Validated" | "Processing" | "Published" | "Failed";
+  assetUrls: string[];
+  altTexts: string[];
+  caption: string;
+  instagramMediaId?: string;
+  instagramPermalink?: string;
+  attemptCount: number;
+  lastError?: string;
+  publishedAt?: string;
+  updatedAt: string;
 };
 
 export type DashboardData = {
   saves: SavedPost[];
   content: ContentPackage[];
   metrics: MetricSnapshot[];
+  sources: BrandSourceInventory[];
+  performanceReviews: PerformanceReview[];
+  publications: CarouselPublication[];
   analyticsConnected: boolean;
+  publishingConnected: boolean;
   liveMode: boolean;
 };

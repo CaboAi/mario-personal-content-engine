@@ -2,12 +2,13 @@
 
 ## System boundary
 
-The engine has two operating surfaces:
+The engine has three operating surfaces:
 
 1. **Repository:** canonical brand knowledge, generation rules, templates, optional sync runtime, and future design/export assets.
-2. **Notion:** daily capture, production state, publishing schedule, hooks, performance data, and weekly review.
+2. **Dashboard + Supabase:** saved-post review, verified source inventory, content production, publishing controls, and fixed-window performance evidence.
+3. **Notion (optional mirror):** migration-period visibility for teams or workflows that still use it.
 
-The repository should not become a second content tracker. Notion should not become the only copy of the brand logic.
+The repository remains the canonical brand logic. Supabase is the dashboard runtime store. Notion is not a runtime dependency.
 
 ## Data flow
 
@@ -15,30 +16,30 @@ The repository should not become a second content tracker. Notion should not bec
 Lived experience / raw observation
               |
               v
-Daily Entries & Content (Notion)
+Verified Mario source inventory (Supabase)
               |
               v
 Goal + hooks + one test variable
               |
               v
-Content Production (Notion)
+Content Production (dashboard)
               |
        script / record / edit
               |
               v
-Publishing Calendar view
+Explicit publish or manual-post link
               |
               v
 Instagram -> TikTok / Shorts / Threads
               |
               v
-Performance Lab view
+24-hour and 7-day Performance Lab windows
               |
               v
-Winner explanation + next test
+Same-window signal + next controlled test
               |
-              +------> Hook Swipe File
-              +------> brand-knowledge/06_LEARNINGS_LEDGER.md
+              +------> Future hook decision
+              +------> brand-knowledge/06_LEARNINGS_LEDGER.md only after repeated evidence
 ```
 
 ## Preserved from the source engine
@@ -60,13 +61,20 @@ Winner explanation + next test
 - The primary content formats are Yap Reel, Mini Story, POV / Realization, Carousel, Written Post, and Long-form.
 - Primary themes are Reinvention, Identity, Standards, Action, Responsibility, Self-Respect, Perspective, and Life Story.
 
+## Current guarded automation
+
+- The daily metrics job captures only due 24-hour and 7-day owned-media windows.
+- Meta-unavailable values remain blank and retry later because insights can lag.
+- Fewer than five comparable same-goal windows produces only “Building baseline.”
+- Carousel publishing remains a dashboard-confirmed action; the scheduled job never publishes.
+- Live source inventory comes from Supabase and never requires Notion.
+
 ## Deferred deliberately
 
 - Twice-daily scheduled saves sync.
-- Automated winner scoring.
 - Automatic cross-platform publishing.
 - Comment mining.
 - AI cover-image generation.
-- Carousel rendering and export.
+- Carousel rendering and asset hosting.
 
 Each deferred component is reconsidered only after the manual version reveals a real bottleneck.

@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import type {
+  BrandSourceInventory,
+  CarouselPublication,
   ContentPackage,
   DashboardData,
+  MetricSnapshot,
   Pairing,
+  PerformanceReview,
   ProductionStatus,
   SavedPost,
 } from "@/lib/domain";
@@ -41,6 +45,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [view, setView] = useState<View>("command");
   const [saves, setSaves] = useState(initialData.saves);
   const [content, setContent] = useState(initialData.content);
+  const [publications, setPublications] = useState(initialData.publications);
   const [selectedSaveId, setSelectedSaveId] = useState(initialData.saves[0]?.id);
   const [selectedPairingId, setSelectedPairingId] = useState<string | undefined>(
     initialData.saves[0]?.pairings.find((pairing) => pairing.recommended)?.id,
@@ -276,16 +281,35 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
         {view === "production" && (
           <ProductionBoard
             content={content}
+            publications={publications}
+            publishingConnected={initialData.publishingConnected}
+            liveMode={initialData.liveMode}
+            onContentChange={(updated) =>
+              setContent((items) =>
+                items.map((item) => (item.id === updated.id ? updated : item)),
+              )
+            }
+            onPublicationChange={(updated) =>
+              setPublications((items) => [
+                updated,
+                ...items.filter((item) => item.contentId !== updated.contentId),
+              ])
+            }
             onStatusChange={updateProductionStatus}
             statusUpdates={statusUpdates}
           />
         )}
 
         {view === "performance" && (
-          <PerformanceLab connected={initialData.analyticsConnected} />
+          <PerformanceLab
+            connected={initialData.analyticsConnected}
+            content={content}
+            metrics={initialData.metrics}
+            reviews={initialData.performanceReviews}
+          />
         )}
 
-        {view === "brand" && <BrandSystem />}
+        {view === "brand" && <BrandSystem sources={initialData.sources} />}
       </main>
     </div>
   );
@@ -571,10 +595,20 @@ function DetailBlock({ label, text }: { label: string; text: string }) {
 
 function ProductionBoard({
   content,
+  publications,
+  publishingConnected,
+  liveMode,
+  onContentChange,
+  onPublicationChange,
   onStatusChange,
   statusUpdates,
 }: {
   content: ContentPackage[];
+  publications: CarouselPublication[];
+  publishingConnected: boolean;
+  liveMode: boolean;
+  onContentChange: (content: ContentPackage) => void;
+  onPublicationChange: (publication: CarouselPublication) => void;
   onStatusChange: (id: string, status: ProductionStatus) => Promise<void>;
   statusUpdates: Record<string, { saving: boolean; error?: string; saved?: boolean }>;
 }) {
@@ -652,6 +686,25 @@ function ProductionBoard({
               <p className="section-label">Internal test note—do not record</p>
               <p>{item.hypothesis}</p>
             </div>
+            {item.carouselSlides.length > 0 && (
+              <div className="carousel-plan">
+                <div className="panel-heading">
+                  <div>
+                    <p className="section-label">Carousel slide plan</p>
+                    <h3>One idea per slide</h3>
+                  </div>
+                  <span>{item.carouselSlides.length} slides</span>
+                </div>
+                <ol>
+                  {item.carouselSlides.map((slide, index) => (
+                    <li key={`${item.id}-slide-${index}`}>
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <div><strong>{slide.headline}</strong><p>{slide.body}</p><small>{slide.altText}</small></div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
             <div className="production-footer">
               <div className="closing-block">
                 <span>Final spoken line</span>
@@ -695,6 +748,22 @@ function ProductionBoard({
                 </span>
               </div>
             </div>
+            <div className="distribution-tools">
+              <InstagramLinker
+                item={item}
+                liveMode={liveMode}
+                onContentChange={onContentChange}
+              />
+              {item.format === "Carousel" && (
+                <CarouselPublisher
+                  item={item}
+                  publication={publications.find((job) => job.contentId === item.id)}
+                  connected={publishingConnected}
+                  liveMode={liveMode}
+                  onPublicationChange={onPublicationChange}
+                />
+              )}
+            </div>
           </article>;
         })}
       </div>
@@ -702,42 +771,272 @@ function ProductionBoard({
   );
 }
 
-function PerformanceLab({ connected }: { connected: boolean }) {
+function InstagramLinker({
+  item,
+  liveMode,
+  onContentChange,
+}: {
+  item: ContentPackage;
+  liveMode: boolean;
+  onContentChange: (content: ContentPackage) => void;
+}) {
+  const [mediaId, setMediaId] = useState("");
+  const [postDate, setPostDate] = useState(new Date().toISOString().slice(0, 16));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  if (item.instagramMediaId) {
+    return (
+      <section className="distribution-card linked">
+        <p className="section-label">Instagram post linked</p>
+        <strong>{item.instagramMediaId}</strong>
+        <span>24-hour and 7-day review windows are scheduled from {item.postDate ? formatDate(item.postDate) : "the post date"}.</span>
+        {item.instagramPermalink && <a href={item.instagramPermalink} target="_blank" rel="noreferrer">Open on Instagram</a>}
+      </section>
+    );
+  }
+
+  async function linkPost() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      if (!liveMode) throw new Error("Supabase is required to schedule review windows.");
+      const parsedDate = new Date(postDate);
+      if (!mediaId.trim() || Number.isNaN(parsedDate.getTime())) throw new Error("Add the Instagram Media ID and post date.");
+      const response = await fetch(`/api/content/${encodeURIComponent(item.id)}/instagram`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instagramMediaId: mediaId.trim(), postDate: parsedDate.toISOString() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Instagram link failed.");
+      onContentChange(result.content);
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Instagram link failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="distribution-card">
+      <p className="section-label">Already published manually?</p>
+      <h3>Link the Instagram post</h3>
+      <p>This does not publish anything. It schedules like-for-like 24-hour and 7-day measurement.</p>
+      <div className="compact-form">
+        <label><span>Instagram Media ID</span><input value={mediaId} onChange={(event) => setMediaId(event.target.value)} placeholder="1789…" /></label>
+        <label><span>Published at</span><input type="datetime-local" value={postDate} onChange={(event) => setPostDate(event.target.value)} /></label>
+        <button type="button" className="secondary-action" disabled={saving || !mediaId.trim()} onClick={() => void linkPost()}>{saving ? "Linking…" : "Link post"}</button>
+      </div>
+      {message && <p className="operation-message error" role="alert">{message}</p>}
+    </section>
+  );
+}
+
+function CarouselPublisher({
+  item,
+  publication,
+  connected,
+  liveMode,
+  onPublicationChange,
+}: {
+  item: ContentPackage;
+  publication?: CarouselPublication;
+  connected: boolean;
+  liveMode: boolean;
+  onPublicationChange: (publication: CarouselPublication) => void;
+}) {
+  const [assetUrls, setAssetUrls] = useState<string[]>(
+    publication?.assetUrls.length ? publication.assetUrls : item.carouselSlides.map(() => ""),
+  );
+  const [caption, setCaption] = useState(publication?.caption ?? item.caption ?? "");
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState<"validate" | "publish" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const altTexts = item.carouselSlides.map((slide) => slide.altText);
+  const currentStatus = publication?.status ?? "Draft";
+
+  function updateAsset(index: number, value: string) {
+    setAssetUrls((values) => values.map((current, currentIndex) => currentIndex === index ? value : current));
+  }
+
+  async function validateAssets() {
+    setBusy("validate");
+    setMessage(null);
+    try {
+      if (!liveMode) throw new Error("Supabase is required to validate carousel assets.");
+      const response = await fetch(`/api/carousels/${encodeURIComponent(item.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetUrls, altTexts, caption }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Carousel validation failed.");
+      onPublicationChange(result.publication);
+      setMessage("Assets validated. Review every slide before enabling publish.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Carousel validation failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function publishCarousel() {
+    setBusy("publish");
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/carousels/${encodeURIComponent(item.id)}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmed: true }),
+      });
+      const result = await response.json();
+      if (!response.ok && response.status !== 202) throw new Error(result.error || "Carousel publishing failed.");
+      if (result.publication) onPublicationChange(result.publication);
+      setMessage(result.message || "Carousel published to Instagram.");
+      setConfirmed(false);
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Carousel publishing failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="distribution-card carousel-publisher">
+      <div className="distribution-heading">
+        <div><p className="section-label">Carousel publisher</p><h3>Validate, review, then publish</h3></div>
+        <StatusPill status={currentStatus} />
+      </div>
+      <p>Use public HTTPS JPEG URLs. Nothing is sent to Meta until the final confirmed button is clicked.</p>
+      <div className="asset-list">
+        {item.carouselSlides.map((slide, index) => (
+          <label key={`${item.id}-asset-${index}`}>
+            <span>Slide {index + 1}: {slide.headline}</span>
+            <input type="url" value={assetUrls[index] ?? ""} onChange={(event) => updateAsset(index, event.target.value)} placeholder="https://…/slide.jpg" />
+            <small>Alt text: {slide.altText}</small>
+          </label>
+        ))}
+      </div>
+      <label className="caption-field"><span>Instagram caption</span><textarea rows={5} value={caption} onChange={(event) => setCaption(event.target.value)} /></label>
+      <div className="publisher-actions">
+        <button type="button" className="secondary-action" disabled={busy !== null || assetUrls.some((url) => !url)} onClick={() => void validateAssets()}>{busy === "validate" ? "Validating…" : "Validate assets"}</button>
+        <label className="publish-confirmation">
+          <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={currentStatus !== "Validated" && currentStatus !== "Processing"} />
+          <span>I reviewed every image, alt text, order, and caption.</span>
+        </label>
+        <button type="button" className="primary-action publish-action" disabled={!connected || !confirmed || busy !== null || (currentStatus !== "Validated" && currentStatus !== "Processing")} onClick={() => void publishCarousel()}>{busy === "publish" ? "Sending to Meta…" : connected ? "Publish carousel to Instagram" : "Connect Meta to publish"}</button>
+      </div>
+      {message && <p className="operation-message" role="status">{message}</p>}
+      {publication?.instagramPermalink && <a href={publication.instagramPermalink} target="_blank" rel="noreferrer">Open published carousel</a>}
+      {publication?.lastError && <p className="operation-message error" role="alert">{publication.lastError}</p>}
+    </section>
+  );
+}
+
+function metricValue(snapshot: MetricSnapshot | undefined, metric: keyof MetricSnapshot) {
+  const value = snapshot?.[metric];
+  return typeof value === "number" ? value.toLocaleString() : "—";
+}
+
+function PerformanceCard({
+  item,
+  metrics,
+  reviews,
+}: {
+  item: ContentPackage;
+  metrics: MetricSnapshot[];
+  reviews: PerformanceReview[];
+}) {
+  const at24 = metrics.find((metric) => metric.contentId === item.id && metric.reviewWindowHours === 24);
+  const at168 = metrics.find((metric) => metric.contentId === item.id && metric.reviewWindowHours === 168);
+  const itemReviews = reviews.filter((review) => review.contentId === item.id);
+  const signal = itemReviews.find((review) => review.status === "Complete")?.signal ?? "Building baseline";
+  const rows: Array<[string, keyof MetricSnapshot]> = [
+    ["Views", "views"], ["Reach", "reach"], ["Average watch time", "averageWatchSeconds"],
+    ["Shares", "shares"], ["Saves", "saves"], ["Follows", "follows"],
+  ];
+  return (
+    <article className="performance-card">
+      <div className="performance-card-heading">
+        <div><span>{item.goal} goal</span><h3>{item.title}</h3></div>
+        <StatusPill status={signal} />
+      </div>
+      <div className="metric-table">
+        <div className="metric-table-head"><span>Metric</span><span>24 hours</span><span>7 days</span><span>Signal</span></div>
+        {rows.map(([label, key]) => (
+          <div className="metric-table-row" key={label}><strong>{label}</strong><span>{metricValue(at24, key)}</span><span>{metricValue(at168, key)}</span><span>{signal}</span></div>
+        ))}
+      </div>
+      {itemReviews.map((review) => (
+        <p className="review-note" key={review.id}><strong>{review.reviewWindowHours === 24 ? "24-hour" : "7-day"} review:</strong> {review.observation || review.lastError || `${review.status} — due ${formatDate(review.dueAt)}`}</p>
+      ))}
+    </article>
+  );
+}
+
+function PerformanceLab({
+  connected,
+  content,
+  metrics,
+  reviews,
+}: {
+  connected: boolean;
+  content: ContentPackage[];
+  metrics: MetricSnapshot[];
+  reviews: PerformanceReview[];
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const linked = content.filter((item) => item.instagramMediaId);
+
+  async function refreshInsights() {
+    setRefreshing(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/jobs/metrics", { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Insight refresh failed.");
+      setMessage(`Checked ${result.due} due window(s); captured ${result.processed}. Reloading…`);
+      window.setTimeout(() => window.location.reload(), 700);
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Insight refresh failed.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <section className="performance-layout stagger-in">
       <div className="performance-lead">
         <p className="section-label">Instagram account insights</p>
         <h2>{connected ? "Analytics connection active" : "Connect Meta to begin the baseline"}</h2>
         <p>
-          Performance only becomes useful when each post is measured at the same review window.
-          The first dashboard version will compare owned media at 24-hour and 7-day snapshots.
+          Each linked post is reviewed at the same 24-hour and 7-day windows. Meta can lag by
+          up to 48 hours, so unavailable values stay blank and retry later instead of becoming zero.
         </p>
-        <button type="button" className="secondary-action" disabled={!connected}>
-          {connected ? "Refresh insights" : "Meta connection comes in Phase 3"}
+        <button type="button" className="secondary-action" disabled={!connected || refreshing} onClick={() => void refreshInsights()}>
+          {refreshing ? "Refreshing…" : connected ? "Refresh due windows" : "Meta connection required"}
         </button>
+        {message && <p className="operation-message" role="status">{message}</p>}
       </div>
-      <div className="metric-table">
-        <div className="metric-table-head">
-          <span>Metric</span><span>24 hours</span><span>7 days</span><span>Signal</span>
+      <div className="performance-stack">
+        <div className="performance-summary">
+          <Metric value={linked.length} label="Linked posts" />
+          <Metric value={reviews.filter((review) => review.status === "Pending").length} label="Windows pending" />
+          <Metric value={reviews.filter((review) => review.status === "Complete").length} label="Windows complete" />
         </div>
-        {[
-          "Views",
-          "Reach",
-          "Average watch time",
-          "Shares",
-          "Saves",
-          "Follows",
-        ].map((metric) => (
-          <div className="metric-table-row" key={metric}>
-            <strong>{metric}</strong><span>Not connected</span><span>Not connected</span><span>Baseline pending</span>
-          </div>
+        {linked.length === 0 ? (
+          <div className="performance-empty">Link an Instagram Media ID from Production after a post goes live.</div>
+        ) : linked.map((item) => (
+          <PerformanceCard key={item.id} item={item} metrics={metrics} reviews={reviews} />
         ))}
       </div>
     </section>
   );
 }
 
-function BrandSystem() {
+function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
   const pillars = [
     "Reinvention",
     "Identity",
@@ -774,6 +1073,26 @@ function BrandSystem() {
           <li>A saved post supplies delivery only, never substance.</li>
           <li>A generic self-improvement account cannot publish it unchanged.</li>
         </ul>
+      </div>
+      <div className="source-inventory">
+        <div className="panel-heading">
+          <div><p className="section-label">Live source inventory</p><h3>Mario-owned material in Supabase</h3></div>
+          <span>{sources.length} sources</span>
+        </div>
+        {sources.length === 0 ? <p>No sources are available.</p> : sources.map((source) => (
+          <article key={source.id}>
+            <div>
+              <span>{source.sourceType}</span>
+              <strong>{source.title}</strong>
+              <p>{source.coreTruth}</p>
+            </div>
+            <div className="source-facts">
+              <StatusPill status={source.status} />
+              <span className={source.privacyStatus === "Clear" ? "privacy clear" : "privacy"}>{source.privacyStatus}</span>
+              <small>{source.usageCount} production use{source.usageCount === 1 ? "" : "s"}</small>
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   );

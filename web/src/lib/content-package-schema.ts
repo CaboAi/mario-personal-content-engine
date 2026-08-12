@@ -12,6 +12,7 @@ export const CONTENT_PILLARS = [
 ] as const;
 
 const nonEmptyString = z.string().trim().min(1);
+const optionalString = z.string().trim();
 
 export const contentPackageSchema = z
   .object({
@@ -41,6 +42,13 @@ export const contentPackageSchema = z
     ),
     skeleton: z.array(nonEmptyString).min(4),
     closingLine: nonEmptyString,
+    cta: optionalString,
+    caption: optionalString,
+    carouselSlides: z.array(z.object({
+      headline: nonEmptyString,
+      body: nonEmptyString,
+      altText: nonEmptyString.max(1_000),
+    })).max(10),
   })
   .superRefine((content, context) => {
     if (!content.spokenHooks.includes(content.selectedHook)) {
@@ -56,6 +64,22 @@ export const contentPackageSchema = z
         code: "custom",
         path: ["selectedOnScreenHook"],
         message: "Selected on-screen hook must be one of the on-screen hook options.",
+      });
+    }
+
+    if (content.format === "Carousel" && content.carouselSlides.length < 2) {
+      context.addIssue({
+        code: "custom",
+        path: ["carouselSlides"],
+        message: "Carousel packages require between 2 and 10 slides.",
+      });
+    }
+
+    if (content.format !== "Carousel" && content.carouselSlides.length > 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["carouselSlides"],
+        message: "Only Carousel packages may include carousel slides.",
       });
     }
   });

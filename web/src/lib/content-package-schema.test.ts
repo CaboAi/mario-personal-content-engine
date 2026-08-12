@@ -19,6 +19,9 @@ const validPackage = {
     "If the opener states the tension immediately, then three-second retention should improve because the right viewer recognizes the problem before scrolling.",
   skeleton: ["Opening tension", "Mario receipt", "What changed", "Earned opinion"],
   closingLine: "Begin before confidence catches up.",
+  cta: "",
+  caption: "",
+  carouselSlides: [],
 };
 
 describe("generated content package validation", () => {
@@ -79,5 +82,15 @@ describe("generated content package validation", () => {
         hypothesis: "A blunt hook should perform better.",
       }),
     ).toThrow("Hypothesis must use an if/then/because structure.");
+  });
+
+  it("requires 2-10 slides for a carousel and forbids them on other formats", () => {
+    expect(() => contentPackageSchema.parse({ ...validPackage, format: "Carousel" })).toThrow(
+      "Carousel packages require between 2 and 10 slides.",
+    );
+    expect(() => contentPackageSchema.parse({
+      ...validPackage,
+      carouselSlides: [{ headline: "One", body: "Body", altText: "Alt" }],
+    })).toThrow("Only Carousel packages may include carousel slides.");
   });
 });

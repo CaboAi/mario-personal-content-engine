@@ -20,6 +20,9 @@ const schema = {
     "hypothesis",
     "skeleton",
     "closingLine",
+    "cta",
+    "caption",
+    "carouselSlides",
   ],
   properties: {
     title: { type: "string" },
@@ -45,6 +48,22 @@ const schema = {
     hypothesis: { type: "string" },
     skeleton: { type: "array", minItems: 4, items: { type: "string" } },
     closingLine: { type: "string" },
+    cta: { type: "string" },
+    caption: { type: "string" },
+    carouselSlides: {
+      type: "array",
+      maxItems: 10,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["headline", "body", "altText"],
+        properties: {
+          headline: { type: "string" },
+          body: { type: "string" },
+          altText: { type: "string" },
+        },
+      },
+    },
   },
 };
 
@@ -64,7 +83,7 @@ export async function generateContentPackage(
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || "gpt-5-mini",
       instructions:
-        "You are Mario Polanco's personal content engine. Mario documents reinvention for men rebuilding after failure, loss, and starting over. Use the saved creator only for delivery DNA. Never transfer the creator's topic, wording, claim, story, identity, examples, or lesson. Use only the supplied Mario-owned source. Be direct, specific, speakable, and participant-level rather than guru-like. Generate 3-5 spoken hooks and 2-3 on-screen hooks. The selected spoken and on-screen hooks must exactly match an option in their respective arrays. Use one or two canonical pillars only: Reinvention, Identity, Standards, Action, Responsibility, Self-Respect, Perspective, or Life Story. Choose exactly one test variable and write a falsifiable hypothesis in the form: If [specific change], then [primary metric] should improve because [audience behavior]. Build a talking skeleton, not a polished full script. Do not invent facts.",
+        "You are Mario Polanco's personal content engine. Mario documents reinvention for men rebuilding after failure, loss, and starting over. Use the saved creator only for delivery DNA. Never transfer the creator's topic, wording, claim, story, identity, examples, or lesson. Use only the supplied Mario-owned source. Be direct, specific, speakable, and participant-level rather than guru-like. Generate 3-5 spoken hooks and 2-3 on-screen hooks. The selected spoken and on-screen hooks must exactly match an option in their respective arrays. Use one or two canonical pillars only: Reinvention, Identity, Standards, Action, Responsibility, Self-Respect, Perspective, or Life Story. Choose exactly one test variable and write a falsifiable hypothesis in the form: If [specific change], then [primary metric] should improve because [audience behavior]. Build a talking skeleton, not a polished full script. Always return cta and caption strings; use an empty string when neither is needed. For Carousel format only, return 2-10 carouselSlides with one screenshot-worthy idea per slide, a repeating visual spine, a payoff, and useful alt text. For every other format, return an empty carouselSlides array. Do not invent facts.",
       input: JSON.stringify({
         savedDeliveryDna: {
           framework: save.frameworkDna,

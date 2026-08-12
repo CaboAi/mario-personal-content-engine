@@ -47,7 +47,7 @@ export async function supabaseRequest<T>(
 export async function getDashboardData(): Promise<DashboardData> {
   if (!isLiveMode()) return demoData;
 
-  const [saves, content, metrics] = await Promise.all([
+  const [saves, content, metrics, sources, performanceReviews, publications] = await Promise.all([
     supabaseRequest<DashboardData["saves"]>(
       "dashboard_saved_posts?select=*&order=savedAt.desc",
     ),
@@ -57,13 +57,26 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabaseRequest<DashboardData["metrics"]>(
       "dashboard_metric_snapshots?select=*&order=capturedAt.desc",
     ),
+    supabaseRequest<DashboardData["sources"]>(
+      "dashboard_brand_sources?select=*&order=updatedAt.desc",
+    ),
+    supabaseRequest<DashboardData["performanceReviews"]>(
+      "dashboard_performance_reviews?select=*&order=dueAt.desc",
+    ),
+    supabaseRequest<DashboardData["publications"]>(
+      "dashboard_carousel_publications?select=*&order=updatedAt.desc",
+    ),
   ]);
 
   return {
     saves,
     content,
     metrics,
-    analyticsConnected: Boolean(process.env.META_ACCESS_TOKEN),
+    sources,
+    performanceReviews,
+    publications,
+    analyticsConnected: Boolean(process.env.META_ACCESS_TOKEN && process.env.META_INSTAGRAM_ACCOUNT_ID),
+    publishingConnected: Boolean(process.env.META_ACCESS_TOKEN && process.env.META_INSTAGRAM_ACCOUNT_ID),
     liveMode: true,
   };
 }

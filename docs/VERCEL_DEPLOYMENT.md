@@ -1,6 +1,6 @@
 # Vercel deployment runbook
 
-This runbook deploys the private Mario Content Engine dashboard. Publishing automation and Meta analytics are not part of this deployment.
+This runbook deploys the private Mario Content Engine dashboard, including guarded Meta analytics and explicit carousel publishing controls.
 
 ## Deployment shape
 
@@ -27,9 +27,15 @@ Add these in **Vercel Project → Settings → Environment Variables**. Apply th
 | `INGESTION_SECRET` | Yes | Shared secret used only by the local Instagram bridge |
 | `OPENAI_API_KEY` | Yes | Server-only OpenAI API key for content generation |
 | `OPENAI_MODEL` | Recommended | Current default is `gpt-5-mini` |
-| `META_ACCESS_TOKEN` | No | Future owned-account analytics connection |
+| `CRON_SECRET` | Yes | Long random value Vercel sends to the daily performance-window job |
+| `META_ACCESS_TOKEN` | To activate Meta | Server-only long-lived token for owned-media insights and publishing |
+| `META_INSTAGRAM_ACCOUNT_ID` | To activate Meta | Mario's Instagram professional account ID |
+| `META_GRAPH_API_VERSION` | Recommended | Defaults to the current integration version, `v25.0` |
+| `META_GRAPH_BASE_URL` | Only if needed | Defaults to `https://graph.instagram.com`; use `https://graph.facebook.com` for Facebook Login tokens |
 
 `NOTION_TOKEN` and `NOTION_CONTENT_DATA_SOURCE_ID` are not required by the deployed dashboard. They belong to the optional migration-period Notion mirror.
+
+The Meta token must include the permissions appropriate to the login path. Instagram Login uses `instagram_business_basic`, `instagram_business_manage_insights`, and `instagram_business_content_publish`. Do not add Meta variables until the professional-account connection is ready; the rest of the dashboard remains operational without them.
 
 Never paste secret values into chat, commit them, prefix them with `NEXT_PUBLIC_`, or place them in `vercel.json`. The Supabase secret and OpenAI key must remain server-only.
 
@@ -81,17 +87,19 @@ Use read-only checks first.
   "ok": true,
   "mode": "live",
   "generation": true,
-  "analytics": false
+  "analytics": false,
+  "publishing": false
 }
 ```
 
-`analytics: false` is expected until Meta analytics is connected.
+`analytics: false` and `publishing: false` are expected until Meta is connected.
 
 3. Open the production root URL and confirm it redirects to `/login`.
 4. Log in with `DASHBOARD_PASSWORD` and confirm the Saves Inbox loads in **live** mode.
 5. Run one local Instagram bridge sync and confirm one saved item appears exactly once in the inbox.
 6. Approve a pairing and confirm OpenAI creates one Production item containing Mario-owned material, 3–5 spoken hooks, 2–3 on-screen hooks, one goal, one test variable, and one hypothesis.
 7. Check Vercel Functions logs for unexpected 4xx/5xx responses. Never copy request headers or secret values into a support message.
+8. After Meta is connected, link one already-published post in Production and confirm that 24-hour and 7-day rows appear in Performance. Do not test the carousel endpoint with Mario's live account unless the exact assets and caption are intentionally ready to publish.
 
 Stop at the first failed boundary:
 
@@ -100,6 +108,8 @@ Stop at the first failed boundary:
 - Login cannot complete: verify both dashboard authentication variables are set.
 - Ingest returns `401`: the local and Vercel ingestion secrets differ.
 - Ingest returns `5xx`: inspect the function log and Supabase REST response before retrying.
+- Metrics returns `503`: both Meta account ID and access token must be configured.
+- Carousel publishing remains disabled: Meta is disconnected, assets are not validated, or the human review checkbox is not selected.
 
 ## Rollback
 

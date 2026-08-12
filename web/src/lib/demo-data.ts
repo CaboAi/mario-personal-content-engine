@@ -96,6 +96,7 @@ export const generatedDemoPackage: ContentPackage = {
     "Opinion: waiting is still a decision, and it usually protects the life you already said you wanted to leave.",
   ],
   closingLine: "Readiness isn't a feeling. It's a decision.",
+  carouselSlides: [],
   platforms: ["Instagram"],
   createdAt: "2026-08-11T21:00:00.000Z",
 };
@@ -104,6 +105,10 @@ export const demoData: DashboardData = {
   saves: [demoSave],
   content: [],
   metrics: [],
+  sources: [],
+  performanceReviews: [],
+  publications: [],
   analyticsConnected: false,
+  publishingConnected: false,
   liveMode: false,
 };
