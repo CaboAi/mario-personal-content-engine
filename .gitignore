@@ -1,0 +1,25 @@
+# Credentials and local state
+runtime/config.json
+runtime/state.json
+runtime/sync.log
+web/supabase-projects.local.json
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Generated media
+exports/
+slides/
+covers/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

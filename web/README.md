@@ -1,0 +1,37 @@
+# Mario Content Engine web application
+
+Private Next.js dashboard for Mario's saved-post review, brand-safe content generation, production workflow, and Instagram analytics.
+
+## Local start
+
+1. Copy `.env.example` to `.env.local`.
+2. Add a dashboard password and a long random session secret.
+3. Run the Supabase migration in `supabase/migrations/0001_content_engine.sql`.
+4. Add the Supabase URL, server secret key, OpenAI API key, and ingestion secret.
+5. Run `npm run dev`.
+
+Without Supabase credentials, the application intentionally opens in demonstration mode with the first analyzed Instagram save. Authentication is skipped only in local development when no dashboard password is configured.
+
+## Deploy to Vercel
+
+Deploy this directory as the Vercel project root. If importing the full repository, set the Vercel **Root Directory** to `web`. Use pnpm and add the required secrets in Vercel rather than committing an `.env` file.
+
+The complete environment-variable checklist, deployment flow, local bridge handoff, health check, and rollback procedure are in [`../docs/VERCEL_DEPLOYMENT.md`](../docs/VERCEL_DEPLOYMENT.md).
+
+## Security boundaries
+
+- Instagram session cookies stay in the local Python bridge.
+- The browser never receives the Supabase server secret key or OpenAI API key.
+- The local bridge authenticates to `/api/ingest` using `INGESTION_SECRET`.
+- Production deployments require the dashboard password and session secret.
+- Database tables have RLS enabled and are server-only in the MVP.
+
+## Workflow
+
+`Instagram Save → New → actual-post inspection → delivery-DNA analysis → Needs Review → Approve and generate → Script Ready → Production → Metrics`
+
+Saved posts contribute delivery DNA only. A verified Mario source supplies the story, opinion, and lesson.
+Analysis intentionally requires human-observed notes from the actual post; a Reel or Carousel is never analyzed from its caption alone.
+
+Verified Mario-owned source material is copied into Supabase with `pnpm seed:sources`.
+The seed is idempotent and the dashboard does not read Notion during analysis or generation.

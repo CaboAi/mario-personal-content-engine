@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mario Personal Social Engine"
+  short_description: "Create personal-brand content from lived stories"
+  default_prompt: "Use $mario-personal-social-engine to turn one lived observation into an Instagram-first content package."
