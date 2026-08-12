@@ -308,11 +308,6 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             publications={publications}
             publishingConnected={initialData.publishingConnected}
             liveMode={initialData.liveMode}
-            onContentChange={(updated) =>
-              setContent((items) =>
-                items.map((item) => (item.id === updated.id ? updated : item)),
-              )
-            }
             onPublicationChange={(updated) =>
               setPublications((items) => [
                 updated,
@@ -661,7 +656,6 @@ function ProductionBoard({
   publications,
   publishingConnected,
   liveMode,
-  onContentChange,
   onPublicationChange,
   onStatusChange,
   statusUpdates,
@@ -670,11 +664,15 @@ function ProductionBoard({
   publications: CarouselPublication[];
   publishingConnected: boolean;
   liveMode: boolean;
-  onContentChange: (content: ContentPackage) => void;
   onPublicationChange: (publication: CarouselPublication) => void;
   onStatusChange: (id: string, status: ProductionStatus) => Promise<void>;
   statusUpdates: Record<string, { saving: boolean; error?: string; saved?: boolean }>;
 }) {
+  const [showPosted, setShowPosted] = useState(false);
+  const activeContent = content.filter((item) => item.status !== "Posted");
+  const postedContent = content.filter((item) => item.status === "Posted");
+  const visibleContent = showPosted ? content : activeContent;
+
   if (content.length === 0) {
     return (
       <EmptyState
@@ -686,8 +684,27 @@ function ProductionBoard({
 
   return (
     <section className="production-layout stagger-in">
+      <div className="production-toolbar">
+        <div>
+          <p className="section-label">Active workbench</p>
+          <span>{activeContent.length} active {activeContent.length === 1 ? "package" : "packages"}</span>
+        </div>
+        {postedContent.length > 0 && (
+          <button type="button" className="text-action" onClick={() => setShowPosted((current) => !current)}>
+            {showPosted ? "Hide posted archive" : `Show posted archive (${postedContent.length})`}
+          </button>
+        )}
+      </div>
       <div className="production-list">
-        {content.map((item) => {
+        {visibleContent.length === 0 && (
+          <div className="production-clear">
+            <span className="empty-line" />
+            <p className="section-label">Workbench clear</p>
+            <h2>Everything here has been posted.</h2>
+            <p>Generate the next package from Saves Inbox. Your phone-published posts appear in Performance after the next Instagram sync.</p>
+          </div>
+        )}
+        {visibleContent.map((item) => {
           const alternativeSpokenHooks = item.spokenHooks.filter(
             (hook) => hook !== item.selectedHook,
           );
@@ -819,13 +836,8 @@ function ProductionBoard({
                 </span>
               </div>
             </div>
-            <div className="distribution-tools">
-              <InstagramLinker
-                item={item}
-                liveMode={liveMode}
-                onContentChange={onContentChange}
-              />
-              {item.format === "Carousel" && (
+            {item.format === "Carousel" && (
+              <div className="distribution-tools">
                 <CarouselPublisher
                   item={item}
                   publication={publications.find((job) => job.contentId === item.id)}
@@ -833,73 +845,11 @@ function ProductionBoard({
                   liveMode={liveMode}
                   onPublicationChange={onPublicationChange}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </article>;
         })}
       </div>
-    </section>
-  );
-}
-
-function InstagramLinker({
-  item,
-  liveMode,
-  onContentChange,
-}: {
-  item: ContentPackage;
-  liveMode: boolean;
-  onContentChange: (content: ContentPackage) => void;
-}) {
-  const [mediaId, setMediaId] = useState("");
-  const [postDate, setPostDate] = useState(new Date().toISOString().slice(0, 16));
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  if (item.instagramMediaId) {
-    return (
-      <section className="distribution-card linked">
-        <p className="section-label">Instagram post linked</p>
-        <strong>{item.instagramMediaId}</strong>
-        <span>24-hour and 7-day review windows are scheduled from {item.postDate ? formatDate(item.postDate) : "the post date"}.</span>
-        {item.instagramPermalink && <a href={item.instagramPermalink} target="_blank" rel="noreferrer">Open on Instagram</a>}
-      </section>
-    );
-  }
-
-  async function linkPost() {
-    setSaving(true);
-    setMessage(null);
-    try {
-      if (!liveMode) throw new Error("Supabase is required to schedule review windows.");
-      const parsedDate = new Date(postDate);
-      if (!mediaId.trim() || Number.isNaN(parsedDate.getTime())) throw new Error("Add the Instagram Media ID and post date.");
-      const response = await fetch(`/api/content/${encodeURIComponent(item.id)}/instagram`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instagramMediaId: mediaId.trim(), postDate: parsedDate.toISOString() }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Instagram link failed.");
-      onContentChange(result.content);
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Instagram link failed.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <section className="distribution-card">
-      <p className="section-label">Already published manually?</p>
-      <h3>Link the Instagram post</h3>
-      <p>This does not publish anything. It schedules like-for-like 24-hour and 7-day measurement.</p>
-      <div className="compact-form">
-        <label><span>Instagram Media ID</span><input value={mediaId} onChange={(event) => setMediaId(event.target.value)} placeholder="1789…" /></label>
-        <label><span>Published at</span><input type="datetime-local" value={postDate} onChange={(event) => setPostDate(event.target.value)} /></label>
-        <button type="button" className="secondary-action" disabled={saving || !mediaId.trim()} onClick={() => void linkPost()}>{saving ? "Linking…" : "Link post"}</button>
-      </div>
-      {message && <p className="operation-message error" role="alert">{message}</p>}
     </section>
   );
 }
@@ -1163,14 +1113,14 @@ function PerformanceLab({
       </section>
 
       <section className="performance-section" id="dashboard-experiments">
-        <div className="section-heading-wide"><div><p className="section-label">03 · Dashboard experiments</p><h2>Comparable review windows</h2><p>Only posts linked from Production belong here. They are evaluated at the same elapsed time so hook, format, CTA, and visual tests stay interpretable.</p></div><span>{linked.length} linked</span></div>
+        <div className="section-heading-wide"><div><p className="section-label">03 · Dashboard experiments</p><h2>Comparable review windows</h2><p>Experiments with an established Instagram connection stay here for like-for-like review. Phone-published posts require no ID and appear in the existing-post library after sync.</p></div><span>{linked.length} connected</span></div>
         <div className="performance-summary">
           <Metric value={linked.length} label="Linked posts" />
           <Metric value={reviews.filter((review) => review.status === "Pending").length} label="Windows pending" />
           <Metric value={reviews.filter((review) => review.status === "Complete").length} label="Windows complete" />
         </div>
         <div className="performance-stack">
-          {linked.length === 0 ? <div className="performance-empty">After a dashboard-made post goes live, link its Instagram Media ID in Production to begin controlled review windows.</div> : linked.map((item) => (
+          {linked.length === 0 ? <div className="performance-empty">No controlled review windows are connected yet. Keep posting from your phone; use “Sync existing posts” to bring each published post and its available metrics into the library above.</div> : linked.map((item) => (
             <PerformanceCard key={item.id} item={item} metrics={metrics} reviews={reviews} />
           ))}
         </div>

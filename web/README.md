@@ -40,9 +40,10 @@ The seed is idempotent and the dashboard does not read Notion during analysis or
 ## Performance and publishing
 
 - The authenticated **Import existing posts** action imports Mario's published Instagram media, available lifetime media insights, and up to 90 days of available account-level series into Supabase. Re-running it is idempotent.
+- Production is a phone-first active workbench. Marking an item `Posted` archives it from the default view; posted packages remain recoverable through the collapsed archive. No Instagram Media ID is required. The next Instagram sync brings phone-published posts into the existing-post library.
 - Performance is separated into account trends, the existing-post baseline, dashboard experiments, and winners/patterns. Historical lifetime totals are never presented as retroactive 24-hour or 7-day snapshots.
 - Edits-only Reel diagnostics—hook rate, skip rate, follower/non-follower split, and retention-curve notes—are entered manually per imported Reel. The dashboard does not infer them from views or average watch time.
-- A manually published post can be linked by Instagram Media ID from Production. This schedules comparable 24-hour and 7-day review windows.
+- Existing legacy connections can retain comparable 24-hour and 7-day review windows, but the normal Production workflow does not ask Mario for an Instagram Media ID.
 - The daily Vercel job captures due owned-media insights once Meta is configured. Missing Meta values remain unavailable and retry later; they are never converted to zero.
 - A signal needs at least five comparable same-goal, same-window posts. A signal is a comparison, not a winner declaration or a durable brand learning.
 - Carousel publishing requires 2–10 public HTTPS JPEG assets, matching alt text, validation, a human review checkbox, and an explicit publish click. The scheduler never publishes content automatically.

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Workspace } from "./workspace";
 import { demoData, generatedDemoPackage } from "@/lib/demo-data";
@@ -40,6 +40,33 @@ describe("Production package instructions", () => {
     expect(
       screen.getByText("Save this for the day you start negotiating with yourself."),
     ).toBeTruthy();
+  });
+
+  it("keeps posted items out of the active workbench and removes Media ID linking", () => {
+    render(
+      <Workspace initialData={{
+        ...demoData,
+        content: [{ ...generatedDemoPackage, status: "Posted" }],
+      }} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Production/ }));
+
+    expect(screen.getByText("Everything here has been posted.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show posted archive (1)" })).toBeTruthy();
+    expect(screen.queryByText("Link the Instagram post")).toBeNull();
+    expect(screen.queryByText("Instagram Media ID")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show posted archive (1)" }));
+    expect(screen.getByText(generatedDemoPackage.title)).toBeTruthy();
+  });
+
+  it("clears a package from the workbench as soon as it is marked Posted", async () => {
+    openProduction();
+    fireEvent.change(screen.getByLabelText("Production status"), { target: { value: "Posted" } });
+
+    await waitFor(() => expect(screen.getByText("Everything here has been posted.")).toBeTruthy());
+    expect(screen.queryByText(generatedDemoPackage.title)).toBeNull();
+    expect(screen.getByRole("button", { name: "Show posted archive (1)" })).toBeTruthy();
   });
 
   it("keeps carousel publishing behind asset validation and explicit review", () => {
