@@ -37,7 +37,7 @@ The source and format are separate decisions: the selected source controls what 
 Verified Mario-owned source material is copied into Supabase with `pnpm seed:sources`.
 The seed is idempotent and the dashboard does not read Notion during analysis or generation. The initial inventory is sourced from `brand-knowledge/05_STORY_BANK.md` (including its Daily Entry receipts) and Mario's existing Content Production database. Only developed material that Mario already authored is marked `Clear` + `Verified`; privacy-sensitive Story Bank entries remain unavailable until Mario confirms them. The Brand System shows each source's origin so the inventory is auditable.
 
-## Performance and publishing
+## Performance and production
 
 - The authenticated **Import existing posts** action imports Mario's published Instagram media, available lifetime media insights, and up to 90 days of available account-level series into Supabase. Re-running it is idempotent.
 - Production is a phone-first, one-project-at-a-time workbench. Marking an item `Posted` archives it from the default view; **Remove from Production** parks an unfinished draft in a recoverable archive. No Instagram Media ID is required. The next Instagram sync brings phone-published posts into the existing-post library and, when the caption provides enough evidence, proposes a dashboard-package match for Mario to confirm.
@@ -48,5 +48,5 @@ The seed is idempotent and the dashboard does not read Notion during analysis or
 - Existing legacy connections can retain comparable 24-hour and 7-day review windows, but the normal Production workflow does not ask Mario for an Instagram Media ID.
 - The daily Vercel job captures due owned-media insights once Meta is configured. Missing Meta values remain unavailable and retry later; they are never converted to zero.
 - A signal needs at least five comparable same-goal, same-window posts. A signal is a comparison, not a winner declaration or a durable brand learning.
-- Carousel packages move through `Copy Ready → Designing in Canva → Design Ready → Posted`. The Canva handoff copies the complete slide sequence and caption, keeps draft alt text visible for final review, and provides a short design/export checklist. The normal dashboard workflow does not upload carousel assets or publish them to Meta.
+- Carousel packages move through `Copy Ready → Designing in Canva → Design Ready → Posted`. The consolidated Canva production section copies the complete slide sequence, any final line or optional CTA not already present on the final slide, and the caption. It keeps draft alt text visible for final review and provides a short design/export checklist. The dashboard does not expose carousel asset-upload or Meta-publishing endpoints.
 - The Brand System reads its live source inventory directly from Supabase. Notion is not required.

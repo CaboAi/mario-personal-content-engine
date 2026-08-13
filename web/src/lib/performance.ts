@@ -1,4 +1,4 @@
-import type { ContentPackage, MetricSnapshot } from "./domain";
+import type { ContentFormat, ContentPackage, MetricSnapshot } from "./domain";
 import type { MetaMetrics } from "./meta-insights";
 
 const goalMetric: Record<ContentPackage["goal"], keyof MetaMetrics> = {
@@ -8,6 +8,47 @@ const goalMetric: Record<ContentPackage["goal"], keyof MetaMetrics> = {
   Follows: "follows",
   Trust: "averageWatchSeconds",
 };
+
+export type ExperimentMetricKey =
+  | "views"
+  | "reach"
+  | "averageWatchSeconds"
+  | "likes"
+  | "comments"
+  | "shares"
+  | "saves"
+  | "follows";
+
+export type ExperimentMetricRow = {
+  label: string;
+  key: ExperimentMetricKey;
+};
+
+const videoMetricRows: ExperimentMetricRow[] = [
+  { label: "Views", key: "views" },
+  { label: "Reach", key: "reach" },
+  { label: "Average watch time", key: "averageWatchSeconds" },
+  { label: "Shares", key: "shares" },
+  { label: "Saves", key: "saves" },
+  { label: "Follows", key: "follows" },
+];
+
+const staticMetricRows: ExperimentMetricRow[] = [
+  { label: "Views", key: "views" },
+  { label: "Reach", key: "reach" },
+  { label: "Likes", key: "likes" },
+  { label: "Comments", key: "comments" },
+  { label: "Shares", key: "shares" },
+  { label: "Saves", key: "saves" },
+  { label: "Follows", key: "follows" },
+];
+
+export function getExperimentMetricRows(format: ContentFormat): ExperimentMetricRow[] {
+  const rows = format === "Yap Reel" || format === "Mini Story" || format === "POV / Realization"
+    ? videoMetricRows
+    : staticMetricRows;
+  return rows.map((row) => ({ ...row }));
+}
 
 export function analyzePerformanceWindow(
   content: Pick<ContentPackage, "goal" | "testVariable">,

@@ -13,7 +13,7 @@ Supabase becomes the application source of truth. Notion remains available as a 
 3. A background analysis job inspects delivery DNA and creates up to three Mario-owned pairings.
 4. Mario reviews a saved post and selects one pairing in the dashboard.
 5. One action generates the creative package and moves it into Production.
-6. Mario moves the item through Script Ready, Ready to Record, Recorded, Edited, Scheduled, and Posted.
+6. Mario moves the item through the workflow for its format: recording stages for Reels, Canva stages for Carousels, and writing stages for Written Post and Long-form.
 7. The official Meta API later attaches analytics snapshots to posted content.
 
 ## MVP screens

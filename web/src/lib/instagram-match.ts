@@ -23,6 +23,38 @@ export type InstagramContentMatch = {
   reason: string;
 };
 
+export type InstagramMediaFamily = "video" | "carousel" | "image" | "unknown";
+
+export function instagramMediaFamily(input: InstagramMatchInput): InstagramMediaFamily {
+  const productType = input.mediaProductType?.trim().toUpperCase() ?? "";
+  const mediaType = input.mediaType?.trim().toUpperCase() ?? "";
+
+  // Meta normally returns REELS as media_product_type with VIDEO as media_type.
+  // Treat the product classification as authoritative if the two ever disagree.
+  if (productType.includes("REEL")) return "video";
+  if (productType.includes("CAROUSEL")) return "carousel";
+  if (mediaType.includes("CAROUSEL")) return "carousel";
+  if (mediaType.includes("VIDEO")) return "video";
+  if (mediaType.includes("IMAGE")) return "image";
+  return "unknown";
+}
+
+export function isInstagramFormatCompatible(
+  input: InstagramMatchInput,
+  format?: string | null,
+) {
+  const family = instagramMediaFamily(input);
+  if (family === "video") {
+    return format === "Yap Reel" || format === "Mini Story" || format === "POV / Realization";
+  }
+  if (family === "carousel") return format === "Carousel";
+  // Long-form is currently a written long-form package, so an Instagram IMAGE is
+  // compatible. If Meta identifies the post as Reels/video or carousel, those more
+  // specific product signals above win and Long-form is rejected.
+  if (family === "image") return format === "Written Post" || format === "Long-form";
+  return false;
+}
+
 export function resolveInstagramMatchSuggestion(
   confirmedContentId: string | null,
   computed: InstagramContentMatch | null,
@@ -102,16 +134,6 @@ function fieldSimilarity(mediaCaption: string, candidateText: string) {
   };
 }
 
-function formatFits(input: InstagramMatchInput, format?: string | null) {
-  const product = `${input.mediaProductType ?? ""} ${input.mediaType ?? ""}`.toUpperCase();
-  if (product.includes("REEL") || product.includes("VIDEO")) {
-    return format === "Yap Reel" || format === "Mini Story" || format === "POV / Realization";
-  }
-  if (product.includes("CAROUSEL")) return format === "Carousel";
-  if (product.includes("IMAGE")) return format === "Written Post" || format === "POV / Realization";
-  return false;
-}
-
 const matchFields = [
   { key: "caption", label: "generated caption", weight: 1 },
   { key: "selectedHook", label: "selected spoken hook", weight: 0.94 },
@@ -130,6 +152,7 @@ export function suggestInstagramContentMatch(
   const ranked = candidates
     .filter((candidate) => !candidate.instagramMediaId)
     .filter((candidate) => candidate.id !== input.dismissedContentId)
+    .filter((candidate) => isInstagramFormatCompatible(input, candidate.format))
     .map((candidate) => {
       const evidenceInputs: Array<{
         score: number;
@@ -154,8 +177,7 @@ export function suggestInstagramContentMatch(
       evidence.sort((a, b) => b.weightedScore - a.weightedScore);
       const best = evidence[0];
       const corroboration = evidence.slice(1).some((item) => item.weightedScore >= 0.34) ? 0.05 : 0;
-      const formatBonus = formatFits(input, candidate.format) ? 0.03 : 0;
-      const confidence = Math.min(0.99, best.weightedScore + corroboration + formatBonus);
+      const confidence = Math.min(0.99, best.weightedScore + corroboration + 0.03);
       return { candidate, best, confidence };
     })
     .filter((result) => result.confidence >= 0.46)

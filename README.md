@@ -35,7 +35,7 @@ The local bridge writes normalized saves to the dashboard without sending Instag
 
 The live deployment checklist is in [`docs/VERCEL_DEPLOYMENT.md`](docs/VERCEL_DEPLOYMENT.md). Vercel must use `web` as the Root Directory; production secrets are configured in Vercel and remain out of the repository.
 
-The dashboard now includes live Supabase source inventory, fixed-window Meta insight capture, manual post linking, and a review-gated carousel publisher. Notion remains an optional mirror and is not required for dashboard operation.
+The dashboard now includes live Supabase source inventory, fixed-window Meta insight capture, manual post linking, and a Canva-first carousel production handoff. Carousels are designed in Canva and posted from the phone; the dashboard does not publish them to Meta. Notion remains an optional mirror and is not required for dashboard operation.
 
 ## Non-negotiable rule
 

@@ -500,37 +500,22 @@ a { color: inherit; }
 .script-risk-lines { max-width: 76ch; padding: .9rem 1rem; border-left: 2px solid var(--accent); background: rgba(156, 117, 53, .06); }
 .script-risk-lines ul { display: grid; gap: .35rem; margin: .6rem 0 0; padding-left: 1rem; }
 .script-risk-lines li { color: var(--muted); font-size: .65rem; line-height: 1.45; }
+.source-inventory .panel-heading > span { color: var(--muted); font-family: var(--font-geist-mono), monospace; font-size: .62rem; }
 
-.carousel-plan { margin-top: 1.5rem; border-top: 1px solid var(--ink); }
-.carousel-plan .panel-heading > span, .source-inventory .panel-heading > span { color: var(--muted); font-family: var(--font-geist-mono), monospace; font-size: .62rem; }
-.carousel-plan ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .7rem; margin: 0; padding: 0; list-style: none; }
-.carousel-plan li { display: grid; grid-template-columns: 2rem 1fr; gap: .7rem; padding: 1rem; border: 1px solid var(--line); border-radius: .7rem; background: var(--white); }
-.carousel-plan li > span { color: var(--accent-dark); font-family: var(--font-geist-mono), monospace; font-size: .62rem; }
-.carousel-plan li div { display: grid; gap: .4rem; }
-.carousel-plan li strong { font-size: .78rem; }
-.carousel-plan li p, .carousel-plan li small { margin: 0; color: var(--muted); font-size: .68rem; line-height: 1.45; }
-.carousel-plan li small { padding-top: .45rem; border-top: 1px solid var(--line); }
-
-.distribution-tools { display: grid; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--ink); }
-.distribution-card { padding: 1.15rem; border: 1px solid var(--line); border-radius: .8rem; background: rgba(255,255,255,.52); }
-.distribution-card.linked { display: grid; gap: .45rem; border-left: 3px solid var(--success); }
-.distribution-card h3 { margin: .15rem 0 0; font-size: 1.1rem; letter-spacing: -.03em; }
-.distribution-card > p:not(.section-label), .distribution-card > span { max-width: 74ch; color: var(--muted); font-size: .68rem; line-height: 1.5; }
-.distribution-card a { width: fit-content; color: var(--accent-dark); font-size: .68rem; }
-.distribution-heading, .performance-card-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
-.compact-form { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(12rem, .8fr) auto; gap: .7rem; align-items: end; margin-top: 1rem; }
-.compact-form label, .caption-field { display: grid; gap: .35rem; }
-.compact-form label span, .caption-field > span { color: var(--muted); font-size: .62rem; }
-.compact-form input, .caption-field textarea { width: 100%; min-height: 2.6rem; padding: .62rem .7rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--white); color: var(--ink); font: .7rem/1.45 var(--font-geist-sans), sans-serif; outline: none; }
-.compact-form input:focus, .caption-field textarea:focus { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
-.caption-field textarea { resize: vertical; }
 .operation-message { margin: .8rem 0 0 !important; color: var(--success) !important; font-size: .65rem !important; }
 .operation-message.error { color: var(--error) !important; }
 
-.canva-handoff { display: grid; gap: 1.2rem; border-left: 3px solid var(--accent); background: rgba(252,251,248,.82); }
+.canva-production { display: grid; gap: 1.2rem; margin-top: 1.5rem; padding: clamp(1rem, 2.4vw, 1.5rem); border: 1px solid var(--line); border-top-color: var(--ink); border-left: 3px solid var(--accent); border-radius: .8rem; background: rgba(252,251,248,.82); }
+.canva-production h3 { margin: .15rem 0 0; font-size: 1.1rem; letter-spacing: -.03em; }
+.canva-production > p:not(.section-label) { max-width: 74ch; margin: 0; color: var(--muted); font-size: .68rem; line-height: 1.5; }
+.distribution-heading, .performance-card-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
 .handoff-stage { padding: .28rem .5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--accent-dark) !important; font-family: var(--font-geist-mono), monospace; font-size: .58rem !important; white-space: nowrap; }
 .canva-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
 .canva-actions button:active, .canva-slide-copy button:active { transform: translateY(1px); }
+.canva-sequence-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding-top: .2rem; }
+.canva-sequence-heading .section-label { margin: 0 0 .3rem; }
+.canva-sequence-heading h4 { margin: 0; font-size: .82rem; font-weight: 600; letter-spacing: -.02em; }
+.canva-sequence-heading > span { max-width: 28ch; color: var(--muted); font-size: .58rem; line-height: 1.4; text-align: right; }
 .canva-slide-copy { margin: 0; padding: 0; border-top: 1px solid var(--ink); list-style: none; }
 .canva-slide-copy li { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: .8rem; align-items: start; padding: 1rem 0; border-bottom: 1px solid var(--line); }
 .canva-slide-copy li > span { padding-top: .16rem; color: var(--accent-dark); font-family: var(--font-geist-mono), monospace; font-size: .58rem; }
@@ -655,8 +640,6 @@ a { color: inherit; }
   .list-heading { grid-column: 1 / -1; }
   .save-row { border: 1px solid var(--line); border-radius: .7rem; }
   .performance-layout { gap: 2.5rem; padding-top: 2.5rem; }
-  .compact-form { grid-template-columns: 1fr 1fr; }
-  .compact-form button { grid-column: 1 / -1; }
   .format-picker { grid-template-columns: repeat(3, 1fr); }
   .performance-intro, .trend-layout { grid-template-columns: 1fr; gap: 1.5rem; }
   .pattern-ledger { grid-template-columns: repeat(3, 1fr); }
@@ -721,10 +704,10 @@ a { color: inherit; }
   .edits-form { grid-template-columns: 1fr 1fr; }
   .pattern-ledger { grid-template-columns: 1fr; }
   .retention-framework { grid-column: 1; }
-  .compact-form { grid-template-columns: 1fr; }
-  .compact-form button { grid-column: 1; width: 100%; }
   .canva-actions { align-items: stretch; flex-direction: column; }
   .canva-actions button { width: 100%; }
+  .canva-sequence-heading { align-items: start; flex-direction: column; gap: .35rem; }
+  .canva-sequence-heading > span { max-width: none; text-align: left; }
   .canva-slide-copy li { grid-template-columns: 2rem minmax(0, 1fr); }
   .canva-slide-copy button { grid-column: 2; width: fit-content; }
   .handoff-checklist { grid-template-columns: 1fr; gap: .7rem; }

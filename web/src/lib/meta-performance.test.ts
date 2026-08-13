@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { carouselDraftSchema } from "./carousel";
 import { parseMediaInsights } from "./meta-insights";
-import { analyzePerformanceWindow } from "./performance";
+import { analyzePerformanceWindow, getExperimentMetricRows } from "./performance";
 
 describe("Meta workflow contracts", () => {
   it("parses lifetime insight values and converts watch milliseconds to seconds", () => {
@@ -35,15 +34,34 @@ describe("Meta workflow contracts", () => {
     expect(analysis.observation).toMatch(/not a winner declaration/i);
   });
 
-  it("requires 2-10 public HTTPS JPEG assets with matching alt text", () => {
-    expect(carouselDraftSchema.parse({
-      assetUrls: ["https://cdn.example.com/1.jpg", "https://cdn.example.com/2.jpeg"],
-      altTexts: ["First slide", "Second slide"],
-      caption: "Caption",
-    }).assetUrls).toHaveLength(2);
-    expect(() => carouselDraftSchema.parse({
-      assetUrls: ["http://localhost/1.png", "https://cdn.example.com/2.jpg"],
-      altTexts: ["First", "Second"], caption: "",
-    })).toThrow();
-  });
+  it.each(["Yap Reel", "Mini Story", "POV / Realization"] as const)(
+    "uses video experiment metrics for %s",
+    (format) => {
+      expect(getExperimentMetricRows(format)).toEqual([
+        { label: "Views", key: "views" },
+        { label: "Reach", key: "reach" },
+        { label: "Average watch time", key: "averageWatchSeconds" },
+        { label: "Shares", key: "shares" },
+        { label: "Saves", key: "saves" },
+        { label: "Follows", key: "follows" },
+      ]);
+    },
+  );
+
+  it.each(["Carousel", "Written Post", "Long-form"] as const)(
+    "uses static engagement metrics without watch time for %s",
+    (format) => {
+      const rows = getExperimentMetricRows(format);
+      expect(rows).toEqual([
+        { label: "Views", key: "views" },
+        { label: "Reach", key: "reach" },
+        { label: "Likes", key: "likes" },
+        { label: "Comments", key: "comments" },
+        { label: "Shares", key: "shares" },
+        { label: "Saves", key: "saves" },
+        { label: "Follows", key: "follows" },
+      ]);
+      expect(rows.some((row) => row.key === "averageWatchSeconds")).toBe(false);
+    },
+  );
 });

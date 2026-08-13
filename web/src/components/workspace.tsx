@@ -15,7 +15,8 @@ import type {
   SavedPost,
 } from "@/lib/domain";
 import { generatedDemoPackage } from "@/lib/demo-data";
-import { fullDraftKind, supportsFullDraft } from "@/lib/format-contracts";
+import { fullDraftKind, initialProductionStatus, productionStatusesFor, supportsFullDraft } from "@/lib/format-contracts";
+import { getExperimentMetricRows } from "@/lib/performance";
 
 type View = "command" | "saves" | "production" | "performance" | "brand";
 
@@ -27,33 +28,13 @@ const views: Array<{ id: View; label: string; index: string }> = [
   { id: "brand", label: "Brand System", index: "05" },
 ];
 
-const videoAndWritingStatuses: ProductionStatus[] = [
-  "Script Ready",
-  "Ready to Record",
-  "Recorded",
-  "Edited",
-  "Scheduled",
-  "Posted",
-];
-
-const carouselStatuses: ProductionStatus[] = [
-  "Copy Ready",
-  "Designing in Canva",
-  "Design Ready",
-  "Posted",
-];
-
-function productionStatusesFor(format: ContentFormat) {
-  return format === "Carousel" ? carouselStatuses : videoAndWritingStatuses;
-}
-
 const contentFormats: Array<{ id: ContentFormat; label: string; purpose: string }> = [
   { id: "Yap Reel", label: "Yap Reel", purpose: "One direct argument to camera; optional full script later" },
   { id: "Mini Story", label: "Mini Story", purpose: "A lived scene, turn, and realization; optional full script later" },
   { id: "POV / Realization", label: "POV / Realization", purpose: "One sendable line with simple B-roll—intentionally lightweight" },
   { id: "Carousel", label: "Carousel", purpose: "A complete swipeable visual essay with slide copy" },
   { id: "Written Post", label: "Written Post", purpose: "A nuanced text post; optional full written draft later" },
-  { id: "Long-form", label: "Long-form", purpose: "A developed essay or longer spoken piece; optional full script later" },
+  { id: "Long-form", label: "Long-form", purpose: "A developed written essay with argument, story, and an optional full draft" },
 ];
 
 function suggestedFormat(contentType?: SavedPost["contentType"]): ContentFormat {
@@ -104,7 +85,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   );
   const reviewCount = saves.filter((save) => save.status === "Needs Review").length;
   const readyCount = content.filter(
-    (item) => !item.archivedAt && (item.status === "Script Ready" || item.status === "Copy Ready"),
+    (item) => !item.archivedAt && item.status === initialProductionStatus(item.format),
   ).length;
   const inventoryCount = content.filter(
     (item) => !item.archivedAt && item.status !== "Posted",
@@ -855,6 +836,7 @@ function ProductionBoard({
           const isVideo = item.format === "Yap Reel" || item.format === "Mini Story" || item.format === "POV / Realization";
           const isCarousel = item.format === "Carousel";
           const isLongForm = item.format === "Long-form";
+          const isWritten = item.format === "Written Post" || isLongForm;
           const openingLabel = isVideo ? "Recommended spoken hook" : "Recommended opening line";
           const openingInstruction = isVideo ? "Say this first" : isCarousel ? "Use this as the first-slide thought" : "Open the written piece with this";
           const visualLabel = isVideo ? "On-screen hook" : isCarousel ? "Carousel cover hook" : "Headline / first-frame hook";
@@ -982,28 +964,9 @@ function ProductionBoard({
               </section>
             </div>
             <div className="hypothesis">
-              <p className="section-label">Internal test note—do not record</p>
+              <p className="section-label">{isVideo ? "Internal test note—do not record" : "Internal test note—not part of the post"}</p>
               <p>{item.hypothesis}</p>
             </div>
-            {item.carouselSlides.length > 0 && (
-              <div className="carousel-plan">
-                <div className="panel-heading">
-                  <div>
-                    <p className="section-label">Carousel slide plan</p>
-                    <h3>One idea per slide</h3>
-                  </div>
-                  <span>{item.carouselSlides.length} slides</span>
-                </div>
-                <ol>
-                  {item.carouselSlides.map((slide, index) => (
-                    <li key={`${item.id}-slide-${index}`}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <div><strong>{slide.headline}</strong><p>{slide.body}</p><small>{slide.altText}</small></div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
             <div className="production-footer">
               <div className="closing-block">
                 <span>{isVideo ? "Final spoken line" : isCarousel ? "Final slide line" : "Final written line"}</span>
@@ -1017,7 +980,7 @@ function ProductionBoard({
                 )}
               </div>
               <div className="status-control">
-                <label htmlFor={`status-${item.id}`}>{isCarousel ? "Carousel status" : "Production status"}</label>
+                <label htmlFor={`status-${item.id}`}>{isCarousel ? "Carousel status" : isWritten ? "Writing status" : "Reel status"}</label>
                 <select
                   id={`status-${item.id}`}
                   value={item.status}
@@ -1048,9 +1011,7 @@ function ProductionBoard({
               </div>
             </div>
             {item.format === "Carousel" && (
-              <div className="distribution-tools">
-                <CanvaHandoff item={item} />
-              </div>
+              <CanvaHandoff item={item} />
             )}
           </article>;
         })}
@@ -1108,19 +1069,36 @@ function CanvaHandoff({ item }: { item: ContentPackage }) {
     }
   };
 
+  const finalSlide = item.carouselSlides.at(-1);
+  let representedFinalCopy = finalSlide
+    ? `${finalSlide.headline}\n${finalSlide.body}`
+    : "";
+  const supplements: string[] = [];
+  const closingLine = item.closingLine.trim();
+  const optionalCta = item.cta?.trim() ?? "";
+
+  if (closingLine && !representedFinalCopy.includes(closingLine)) {
+    supplements.push(`FINAL SLIDE LINE\n${closingLine}`);
+    representedFinalCopy += `\n${closingLine}`;
+  }
+  if (optionalCta && !representedFinalCopy.includes(optionalCta)) {
+    supplements.push(`OPTIONAL CTA\n${optionalCta}`);
+  }
+
   const allCopy = [
     `CAROUSEL: ${item.title}`,
     ...item.carouselSlides.map((slide, index) =>
       `SLIDE ${index + 1}${index === 0 ? " (COVER)" : ""}\n${slide.headline}\n${slide.body}`,
     ),
+    ...supplements,
     item.caption ? `INSTAGRAM CAPTION\n${item.caption}` : null,
   ].filter(Boolean).join("\n\n");
 
   return (
-    <section className="distribution-card canva-handoff">
+    <section className="canva-production">
       <div className="distribution-heading">
         <div>
-          <p className="section-label">Canva handoff</p>
+          <p className="section-label">Canva production</p>
           <h3>Copy, design in Canva, then post from your phone</h3>
         </div>
         <span className="handoff-stage">{item.carouselSlides.length} slides</span>
@@ -1138,6 +1116,13 @@ function CanvaHandoff({ item }: { item: ContentPackage }) {
         )}
       </div>
 
+      <div className="canva-sequence-heading">
+        <div>
+          <p className="section-label">Exact slide sequence</p>
+          <h4>One idea per slide, in posting order</h4>
+        </div>
+        <span>Copy individually or use the complete handoff above</span>
+      </div>
       <ol className="canva-slide-copy" aria-label="Carousel copy for Canva">
         {item.carouselSlides.map((slide, index) => {
           const slideLabel = `slide-${index + 1}`;
@@ -1198,10 +1183,7 @@ function PerformanceCard({
   const at168 = metrics.find((metric) => metric.contentId === item.id && metric.reviewWindowHours === 168);
   const itemReviews = reviews.filter((review) => review.contentId === item.id);
   const signal = itemReviews.find((review) => review.status === "Complete")?.signal ?? "Building baseline";
-  const rows: Array<[string, keyof MetricSnapshot]> = [
-    ["Views", "views"], ["Reach", "reach"], ["Average watch time", "averageWatchSeconds"],
-    ["Shares", "shares"], ["Saves", "saves"], ["Follows", "follows"],
-  ];
+  const rows = getExperimentMetricRows(item.format);
   return (
     <article className="performance-card">
       <div className="performance-card-heading">
@@ -1210,7 +1192,7 @@ function PerformanceCard({
       </div>
       <div className="metric-table">
         <div className="metric-table-head"><span>Metric</span><span>24 hours</span><span>7 days</span><span>Signal</span></div>
-        {rows.map(([label, key]) => (
+        {rows.map(({ label, key }) => (
           <div className="metric-table-row" key={label}><strong>{label}</strong><span>{metricValue(at24, key)}</span><span>{metricValue(at168, key)}</span><span>{signal}</span></div>
         ))}
       </div>

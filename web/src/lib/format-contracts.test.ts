@@ -4,6 +4,9 @@ import {
   fullDraftKind,
   getFormatGenerationInstructions,
   getFullDraftInstructions,
+  initialProductionStatus,
+  isProductionStatusForFormat,
+  productionStatusesFor,
   supportsFullDraft,
 } from "./format-contracts";
 
@@ -37,6 +40,43 @@ describe("format generation contracts", () => {
     expect(supportsFullDraft("POV / Realization")).toBe(false);
     expect(supportsFullDraft("Carousel")).toBe(false);
     expect(fullDraftKind("Written Post")).toBe("written draft");
+    expect(fullDraftKind("Long-form")).toBe("written draft");
+    expect(fullDraftKind("Yap Reel")).toBe("script");
     expect(getFullDraftInstructions("Mini Story")).toContain("scene-first");
+    expect(getFullDraftInstructions("Long-form")).toContain("written piece");
+    expect(getFullDraftInstructions("Long-form")).not.toContain("speakable");
+  });
+
+  it("defines format-specific production workflows and honest initial states", () => {
+    expect(initialProductionStatus("Yap Reel")).toBe("Script Ready");
+    expect(initialProductionStatus("Mini Story")).toBe("Script Ready");
+    expect(initialProductionStatus("POV / Realization")).toBe("Concept Ready");
+    expect(initialProductionStatus("Carousel")).toBe("Copy Ready");
+    expect(initialProductionStatus("Written Post")).toBe("Outline Ready");
+    expect(initialProductionStatus("Long-form")).toBe("Outline Ready");
+
+    expect(productionStatusesFor("Written Post")).toEqual([
+      "Outline Ready", "Drafting", "Final Copy", "Scheduled", "Posted",
+    ]);
+    expect(productionStatusesFor("Long-form")).toEqual(
+      productionStatusesFor("Written Post"),
+    );
+    expect(isProductionStatusForFormat("POV / Realization", "Concept Ready")).toBe(true);
+    expect(isProductionStatusForFormat("POV / Realization", "Script Ready")).toBe(false);
+    expect(isProductionStatusForFormat("Long-form", "Ready to Record")).toBe(false);
+    expect(isProductionStatusForFormat("Carousel", "Scheduled")).toBe(false);
+
+    expect(productionStatusesFor("Yap Reel")).toEqual([
+      "Script Ready", "Ready to Record", "Recorded", "Edited", "Scheduled", "Posted",
+    ]);
+    expect(productionStatusesFor("Mini Story")).toEqual(
+      productionStatusesFor("Yap Reel"),
+    );
+    expect(productionStatusesFor("POV / Realization")).toEqual([
+      "Concept Ready", "Ready to Record", "Recorded", "Edited", "Scheduled", "Posted",
+    ]);
+    expect(productionStatusesFor("Carousel")).toEqual([
+      "Copy Ready", "Designing in Canva", "Design Ready", "Posted",
+    ]);
   });
 });

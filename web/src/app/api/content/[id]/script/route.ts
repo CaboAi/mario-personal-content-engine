@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { rejectCrossOrigin, requireDashboardSession } from "@/lib/api-auth";
 import type { ContentPackage, SavedPost } from "@/lib/domain";
-import { supportsFullDraft } from "@/lib/format-contracts";
+import { fullDraftKind, supportsFullDraft } from "@/lib/format-contracts";
 import { generateFullScript } from "@/lib/openai";
 import { isLiveMode, supabaseRequest } from "@/lib/supabase-rest";
 
@@ -46,7 +46,7 @@ export async function POST(
   }
   const parsed = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid script request." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid draft request." }, { status: 400 });
   }
 
   try {
@@ -63,15 +63,16 @@ export async function POST(
     if (!content || !reference) {
       return NextResponse.json({ error: "Content item not found." }, { status: 404 });
     }
+    const draftKind = fullDraftKind(content.format);
     if (reference.archived_at || reference.status === "Posted") {
       return NextResponse.json(
-        { error: "Scripts can only be generated for the active Production project." },
+        { error: `A ${draftKind} can only be generated for the active Production project.` },
         { status: 409 },
       );
     }
     if (!supportsFullDraft(content.format)) {
       return NextResponse.json(
-        { error: `${content.format} intentionally does not use a padded full script.` },
+        { error: `${content.format} intentionally does not use a padded full draft.` },
         { status: 409 },
       );
     }
@@ -113,7 +114,7 @@ export async function POST(
     });
     return NextResponse.json({ content: rows[0] });
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : "Script generation failed.";
+    const message = cause instanceof Error ? cause.message : "Draft generation failed.";
     const conflict = /not Clear and Verified|intentionally does not|Active content item/.test(message);
     return NextResponse.json({ error: message }, { status: conflict ? 409 : 500 });
   }

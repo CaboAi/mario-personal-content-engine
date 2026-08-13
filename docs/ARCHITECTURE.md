@@ -5,7 +5,7 @@
 The engine has three operating surfaces:
 
 1. **Repository:** canonical brand knowledge, generation rules, templates, optional sync runtime, and future design/export assets.
-2. **Dashboard + Supabase:** saved-post review, verified source inventory, content production, publishing controls, and fixed-window performance evidence.
+2. **Dashboard + Supabase:** saved-post review, verified source inventory, format-aware content production, and fixed-window performance evidence.
 3. **Notion (optional mirror):** migration-period visibility for teams or workflows that still use it.
 
 The repository remains the canonical brand logic. Supabase is the dashboard runtime store. Notion is not a runtime dependency.
@@ -24,10 +24,10 @@ Goal + hooks + one test variable
               v
 Content Production (dashboard)
               |
-       script / record / edit
+       write / design / record / edit
               |
               v
-Explicit publish or manual-post link
+Manual phone post + Instagram sync
               |
               v
 Instagram -> TikTok / Shorts / Threads
@@ -66,7 +66,7 @@ Same-window signal + next controlled test
 - The daily metrics job captures only due 24-hour and 7-day owned-media windows.
 - Meta-unavailable values remain blank and retry later because insights can lag.
 - Fewer than five comparable same-goal windows produces only “Building baseline.”
-- Carousel publishing remains a dashboard-confirmed action; the scheduled job never publishes.
+- Carousel production hands complete copy to Canva; the dashboard never publishes it.
 - Live source inventory comes from Supabase and never requires Notion.
 
 ## Deferred deliberately

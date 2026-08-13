@@ -6,16 +6,23 @@ export type SaveStatus =
   | "Ignored"
   | "Blocked";
 
-export type ProductionStatus =
-  | "Script Ready"
-  | "Ready to Record"
-  | "Recorded"
-  | "Edited"
-  | "Scheduled"
-  | "Copy Ready"
-  | "Designing in Canva"
-  | "Design Ready"
-  | "Posted";
+export const PRODUCTION_STATUSES = [
+  "Concept Ready",
+  "Script Ready",
+  "Ready to Record",
+  "Recorded",
+  "Edited",
+  "Scheduled",
+  "Outline Ready",
+  "Drafting",
+  "Final Copy",
+  "Copy Ready",
+  "Designing in Canva",
+  "Design Ready",
+  "Posted",
+] as const;
+
+export type ProductionStatus = (typeof PRODUCTION_STATUSES)[number];
 
 export type ContentFormat =
   | "Yap Reel"
@@ -146,21 +153,6 @@ export type PerformanceReview = {
   lastError?: string;
 };
 
-export type CarouselPublication = {
-  id: string;
-  contentId: string;
-  status: "Draft" | "Validated" | "Processing" | "Published" | "Failed";
-  assetUrls: string[];
-  altTexts: string[];
-  caption: string;
-  instagramMediaId?: string;
-  instagramPermalink?: string;
-  attemptCount: number;
-  lastError?: string;
-  publishedAt?: string;
-  updatedAt: string;
-};
-
 export type InstagramMediaItem = {
   id: string;
   instagramMediaId: string;
@@ -218,10 +210,8 @@ export type DashboardData = {
   metrics: MetricSnapshot[];
   sources: BrandSourceInventory[];
   performanceReviews: PerformanceReview[];
-  publications: CarouselPublication[];
   instagramMedia: InstagramMediaItem[];
   accountTrends: InstagramAccountDaily[];
   analyticsConnected: boolean;
-  publishingConnected: boolean;
   liveMode: boolean;
 };

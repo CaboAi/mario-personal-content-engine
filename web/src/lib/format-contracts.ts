@@ -1,4 +1,46 @@
-import type { ContentFormat } from "./domain";
+import type { ContentFormat, ProductionStatus } from "./domain";
+
+const reelStatuses: readonly ProductionStatus[] = [
+  "Script Ready",
+  "Ready to Record",
+  "Recorded",
+  "Edited",
+  "Scheduled",
+  "Posted",
+];
+
+const povStatuses: readonly ProductionStatus[] = [
+  "Concept Ready",
+  "Ready to Record",
+  "Recorded",
+  "Edited",
+  "Scheduled",
+  "Posted",
+];
+
+const carouselStatuses: readonly ProductionStatus[] = [
+  "Copy Ready",
+  "Designing in Canva",
+  "Design Ready",
+  "Posted",
+];
+
+const writingStatuses: readonly ProductionStatus[] = [
+  "Outline Ready",
+  "Drafting",
+  "Final Copy",
+  "Scheduled",
+  "Posted",
+];
+
+const workflows: Record<ContentFormat, readonly ProductionStatus[]> = {
+  "Yap Reel": reelStatuses,
+  "Mini Story": reelStatuses,
+  "POV / Realization": povStatuses,
+  Carousel: carouselStatuses,
+  "Written Post": writingStatuses,
+  "Long-form": writingStatuses,
+};
 
 const instructions: Record<ContentFormat, string> = {
   "Yap Reel": "Build a talk-to-camera scaffold for one developed argument: personal tension or opinion first, Mario's receipt early, broader takeaway, and a strong closing line. Do not write a polished script in the initial package.",
@@ -19,7 +61,22 @@ export function supportsFullDraft(format: ContentFormat) {
 }
 
 export function fullDraftKind(format: ContentFormat) {
-  return format === "Written Post" ? "written draft" : "script";
+  return format === "Written Post" || format === "Long-form" ? "written draft" : "script";
+}
+
+export function productionStatusesFor(format: ContentFormat) {
+  return workflows[format];
+}
+
+export function initialProductionStatus(format: ContentFormat): ProductionStatus {
+  return workflows[format][0];
+}
+
+export function isProductionStatusForFormat(
+  format: ContentFormat,
+  status: ProductionStatus,
+) {
+  return workflows[format].includes(status);
 }
 
 export function getFullDraftInstructions(format: ContentFormat) {
@@ -31,7 +88,7 @@ export function getFullDraftInstructions(format: ContentFormat) {
     case "Written Post":
       return "Write a complete written post, not a transcript. Use a personal receipt, developed interpretation, and a strong final thought.";
     case "Long-form":
-      return "Write a complete, speakable long-form draft with a central argument, story spine, developed sections, complication, and honest resolution.";
+      return "Write a complete long-form written piece, not a video transcript or spoken script. Develop the central argument, story spine, distinct sections, complication, and honest resolution in durable prose.";
     default:
       return "This format intentionally does not support a padded full draft.";
   }

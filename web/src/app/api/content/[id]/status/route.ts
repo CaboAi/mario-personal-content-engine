@@ -1,21 +1,12 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { ProductionStatus } from "@/lib/domain";
+import { PRODUCTION_STATUSES, type ContentFormat, type ProductionStatus } from "@/lib/domain";
+import { isProductionStatusForFormat } from "@/lib/format-contracts";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 import { isLiveMode, supabaseRequest } from "@/lib/supabase-rest";
 
-const productionStatusSchema = z.enum([
-  "Script Ready",
-  "Ready to Record",
-  "Recorded",
-  "Edited",
-  "Scheduled",
-  "Copy Ready",
-  "Designing in Canva",
-  "Design Ready",
-  "Posted",
-] satisfies ProductionStatus[]);
+const productionStatusSchema = z.enum(PRODUCTION_STATUSES);
 
 const bodySchema = z.object({ status: productionStatusSchema }).strict();
 
@@ -67,8 +58,32 @@ export async function PATCH(
   }
 
   try {
+    const existing = await supabaseRequest<Array<{
+      id: string;
+      format: ContentFormat;
+      archived_at: string | null;
+    }>>(
+      `content_items?id=eq.${encodeURIComponent(id)}&select=id,format,archived_at`,
+    );
+    const content = existing[0];
+    if (!content) {
+      return NextResponse.json({ error: "Content item not found." }, { status: 404 });
+    }
+    if (content.archived_at) {
+      return NextResponse.json(
+        { error: "Archived content cannot change production status." },
+        { status: 409 },
+      );
+    }
+    if (!isProductionStatusForFormat(content.format, parsed.data.status)) {
+      return NextResponse.json(
+        { error: `${parsed.data.status} is not valid for ${content.format}.` },
+        { status: 409 },
+      );
+    }
+
     const rows = await supabaseRequest<Array<{ id: string; status: ProductionStatus }>>(
-      `content_items?id=eq.${encodeURIComponent(id)}&select=id,status`,
+      `content_items?id=eq.${encodeURIComponent(id)}&archived_at=is.null&select=id,status`,
       {
         method: "PATCH",
         headers: { Prefer: "return=representation" },
@@ -79,7 +94,10 @@ export async function PATCH(
       },
     );
     if (!rows[0]) {
-      return NextResponse.json({ error: "Content item not found." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Content item was archived before the status update completed." },
+        { status: 409 },
+      );
     }
     return NextResponse.json({ content: rows[0] });
   } catch (cause) {
