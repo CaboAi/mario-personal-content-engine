@@ -1,7 +1,35 @@
 import { NextResponse } from "next/server";
 import { rejectCrossOrigin, requireDashboardSession } from "@/lib/api-auth";
+import {
+  resolveInstagramMatchSuggestion,
+  suggestInstagramContentMatch,
+  type InstagramMatchCandidate,
+} from "@/lib/instagram-match";
 import { fetchAccountDailyInsights, fetchMediaInsights, listInstagramMedia } from "@/lib/meta";
 import { isLiveMode, supabaseRequest } from "@/lib/supabase-rest";
+
+type ContentRow = {
+  id: string;
+  title: string;
+  format: string;
+  caption: string | null;
+  selected_hook: string;
+  selected_on_screen_hook: string;
+  closing_line: string;
+  skeleton: string[];
+  instagram_media_id: string | null;
+  archived_at: string | null;
+  status: string;
+};
+
+type ExistingMediaRow = {
+  instagram_media_id: string;
+  content_id: string | null;
+  suggested_content_id: string | null;
+  match_confidence: number | null;
+  match_reason: string | null;
+  dismissed_content_id: string | null;
+};
 
 export async function POST(request: Request) {
   const sessionError = await requireDashboardSession();
@@ -11,13 +39,44 @@ export async function POST(request: Request) {
   if (!isLiveMode()) return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
 
   try {
-    const [media, contentRows] = await Promise.all([
+    const [media, contentRows, existingMediaRows] = await Promise.all([
       listInstagramMedia(100),
-      supabaseRequest<Array<{ id: string; instagram_media_id: string }>>(
-        "content_items?select=id,instagram_media_id&instagram_media_id=not.is.null",
+      supabaseRequest<ContentRow[]>(
+        "content_items?select=id,title,format,caption,selected_hook,selected_on_screen_hook,closing_line,skeleton,instagram_media_id,archived_at,status",
+      ),
+      supabaseRequest<ExistingMediaRow[]>(
+        "instagram_media_library?select=instagram_media_id,content_id,suggested_content_id,match_confidence,match_reason,dismissed_content_id",
       ),
     ]);
-    const contentByMedia = new Map(contentRows.map((row) => [row.instagram_media_id, row.id]));
+    const contentByMedia = new Map(contentRows
+      .filter((row) => row.instagram_media_id)
+      .map((row) => [row.instagram_media_id as string, row.id]));
+    const existingByMedia = new Map(existingMediaRows.map((row) => [row.instagram_media_id, row]));
+    const reservedContentIds = new Set(contentRows
+      .filter((row) => row.instagram_media_id)
+      .map((row) => row.id));
+    const eligibleContentIds = new Set(contentRows
+      .filter((row) => !row.archived_at && row.status === "Posted")
+      .map((row) => row.id));
+    for (const row of existingMediaRows) {
+      if (row.content_id) reservedContentIds.add(row.content_id);
+      if (!row.content_id && row.suggested_content_id && eligibleContentIds.has(row.suggested_content_id)) {
+        reservedContentIds.add(row.suggested_content_id);
+      }
+    }
+    const matchCandidates: InstagramMatchCandidate[] = contentRows
+      .filter((row) => !row.archived_at && row.status === "Posted")
+      .map((row) => ({
+      id: row.id,
+      title: row.title,
+      format: row.format,
+      caption: row.caption,
+      selectedHook: row.selected_hook,
+      selectedOnScreenHook: row.selected_on_screen_hook,
+      closingLine: row.closing_line,
+      skeleton: row.skeleton,
+      instagramMediaId: row.instagram_media_id,
+      }));
     const imported: Array<Record<string, unknown>> = [];
     let insightFailures = 0;
 
@@ -33,9 +92,29 @@ export async function POST(request: Request) {
         }
       }));
       for (const { item, metrics } of results) {
+        const existing = existingByMedia.get(item.id);
+        const confirmedContentId = contentByMedia.get(item.id) ?? existing?.content_id ?? null;
+        const suggestion = confirmedContentId ? null : suggestInstagramContentMatch({
+          caption: item.caption,
+          mediaType: item.media_type,
+          mediaProductType: item.media_product_type,
+          dismissedContentId: existing?.dismissed_content_id,
+        }, matchCandidates.filter((candidate) => !reservedContentIds.has(candidate.id)));
+        if (suggestion) reservedContentIds.add(suggestion.contentId);
+        const existingSuggestionIsEligible = existing?.suggested_content_id
+          ? eligibleContentIds.has(existing.suggested_content_id)
+          : false;
+        const suggestionState = resolveInstagramMatchSuggestion(confirmedContentId, suggestion, {
+          suggestedContentId: existingSuggestionIsEligible ? existing?.suggested_content_id : null,
+          matchConfidence: existingSuggestionIsEligible ? existing?.match_confidence : null,
+          matchReason: existingSuggestionIsEligible ? existing?.match_reason : null,
+        });
         imported.push({
           instagram_media_id: item.id,
-          content_id: contentByMedia.get(item.id) ?? null,
+          content_id: confirmedContentId,
+          suggested_content_id: suggestionState.suggestedContentId,
+          match_confidence: suggestionState.matchConfidence,
+          match_reason: suggestionState.matchReason,
           caption: item.caption ?? null,
           media_type: item.media_type ?? null,
           media_product_type: item.media_product_type ?? null,
@@ -97,6 +176,7 @@ export async function POST(request: Request) {
       importedPosts: imported.length,
       postsWithInsights: imported.length - insightFailures,
       insightFailures,
+      matchSuggestions: imported.filter((item) => item.suggested_content_id).length,
       accountDays: accountDays.length,
     });
   } catch (cause) {

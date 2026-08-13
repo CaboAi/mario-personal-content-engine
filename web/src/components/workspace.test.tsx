@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Workspace } from "./workspace";
 import { demoData, generatedDemoPackage } from "@/lib/demo-data";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function openProduction(cta?: string) {
   render(
@@ -67,6 +70,81 @@ describe("Production package instructions", () => {
     await waitFor(() => expect(screen.getByText("Everything here has been posted.")).toBeTruthy());
     expect(screen.queryByText(generatedDemoPackage.title)).toBeNull();
     expect(screen.getByRole("button", { name: "Show posted archive (1)" })).toBeTruthy();
+  });
+
+  it("removes a draft from the active workbench and restores it from a collapsed list", async () => {
+    openProduction();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove from Production" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Removed “Readiness Is a Decision” from Production/)).toBeTruthy(),
+    );
+    expect(screen.queryByRole("button", { name: "Remove from Production" })).toBeNull();
+    expect(screen.getByText("No active production drafts.")).toBeTruthy();
+    const removedSection = screen.getByText("Removed drafts").closest("details");
+    expect(removedSection?.hasAttribute("open")).toBe(false);
+    expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Restored “Readiness Is a Decision” to the active workbench/)).toBeTruthy(),
+    );
+    expect(screen.getByRole("button", { name: "Remove from Production" })).toBeTruthy();
+    expect(screen.queryByText("Removed drafts")).toBeNull();
+  });
+
+  it("keeps archived and posted packages out of the active count", () => {
+    render(
+      <Workspace
+        initialData={{
+          ...demoData,
+          content: [
+            { ...generatedDemoPackage, id: "active", title: "Active draft" },
+            { ...generatedDemoPackage, id: "removed", title: "Removed draft", archivedAt: "2026-08-12T00:00:00Z" },
+            { ...generatedDemoPackage, id: "posted", title: "Posted package", status: "Posted" },
+          ],
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Production/ }));
+
+    expect(screen.getByText("1 active package")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove from Production" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show posted archive (1)" })).toBeTruthy();
+    expect(screen.getByText("Removed drafts")).toBeTruthy();
+  });
+
+  it("persists removal through the archive endpoint", async () => {
+    const item = {
+      ...generatedDemoPackage,
+      id: "98e4ea33-a52a-41f4-b39d-5979f22fc6a2",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ content: { ...item, archivedAt: "2026-08-12T12:00:00Z" } }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <Workspace
+        initialData={{ ...demoData, content: [item], liveMode: true }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Production/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove from Production" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/content/${item.id}/archive`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ archived: true }),
+      }),
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy());
   });
 
   it("keeps carousel publishing behind asset validation and explicit review", () => {

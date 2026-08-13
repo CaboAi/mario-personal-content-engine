@@ -78,14 +78,24 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [statusUpdates, setStatusUpdates] = useState<
     Record<string, { saving: boolean; error?: string; saved?: boolean }>
   >({});
+  const [archiveUpdates, setArchiveUpdates] = useState<
+    Record<string, { saving: boolean; error?: string; saved?: boolean }>
+  >({});
+  const [archiveFeedback, setArchiveFeedback] = useState<
+    { message: string; error?: boolean } | null
+  >(null);
 
   const selectedSave = saves.find((save) => save.id === selectedSaveId);
   const selectedPairing = selectedSave?.pairings.find(
     (pairing) => pairing.id === selectedPairingId,
   );
   const reviewCount = saves.filter((save) => save.status === "Needs Review").length;
-  const readyCount = content.filter((item) => item.status === "Script Ready").length;
-  const inventoryCount = content.filter((item) => item.status !== "Posted").length;
+  const readyCount = content.filter(
+    (item) => !item.archivedAt && item.status === "Script Ready",
+  ).length;
+  const inventoryCount = content.filter(
+    (item) => !item.archivedAt && item.status !== "Posted",
+  ).length;
 
   async function approveAndGenerate() {
     if (!selectedSave || !selectedPairing) return;
@@ -212,6 +222,65 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
     }
   }
 
+  async function updateContentArchive(id: string, archived: boolean) {
+    const previous = content.find((item) => item.id === id);
+    if (!previous || Boolean(previous.archivedAt) === archived) return;
+
+    const archivedAt = archived ? new Date().toISOString() : null;
+    setArchiveFeedback(null);
+    setContent((items) =>
+      items.map((item) => (item.id === id ? { ...item, archivedAt } : item)),
+    );
+    setArchiveUpdates((updates) => ({
+      ...updates,
+      [id]: { saving: true },
+    }));
+
+    try {
+      if (initialData.liveMode) {
+        const response = await fetch(`/api/content/${encodeURIComponent(id)}/archive`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived }),
+        });
+        const result = await response.json().catch(() => ({
+          error: response.redirected
+            ? "Your dashboard session expired. Sign in again, then retry."
+            : "The server returned an unreadable response.",
+        }));
+        if (!response.ok || !result.content) {
+          throw new Error(result.error || "Production update failed.");
+        }
+        const persisted = result.content as ContentPackage;
+        setContent((items) =>
+          items.map((item) => (item.id === id ? { ...item, ...persisted } : item)),
+        );
+      } else {
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      }
+
+      setArchiveUpdates((updates) => ({
+        ...updates,
+        [id]: { saving: false, saved: true },
+      }));
+      setArchiveFeedback({
+        message: archived
+          ? `Removed “${previous.title}” from Production. You can restore it below.`
+          : `Restored “${previous.title}” to the active workbench.`,
+      });
+    } catch (cause) {
+      setContent((items) =>
+        items.map((item) => (item.id === id ? previous : item)),
+      );
+      const message = cause instanceof Error ? cause.message : "Production update failed.";
+      setArchiveUpdates((updates) => ({
+        ...updates,
+        [id]: { saving: false, error: message },
+      }));
+      setArchiveFeedback({ message, error: true });
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="side-rail">
@@ -316,6 +385,9 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             }
             onStatusChange={updateProductionStatus}
             statusUpdates={statusUpdates}
+            onArchiveChange={updateContentArchive}
+            archiveUpdates={archiveUpdates}
+            archiveFeedback={archiveFeedback}
           />
         )}
 
@@ -659,6 +731,9 @@ function ProductionBoard({
   onPublicationChange,
   onStatusChange,
   statusUpdates,
+  onArchiveChange,
+  archiveUpdates,
+  archiveFeedback,
 }: {
   content: ContentPackage[];
   publications: CarouselPublication[];
@@ -667,11 +742,15 @@ function ProductionBoard({
   onPublicationChange: (publication: CarouselPublication) => void;
   onStatusChange: (id: string, status: ProductionStatus) => Promise<void>;
   statusUpdates: Record<string, { saving: boolean; error?: string; saved?: boolean }>;
+  onArchiveChange: (id: string, archived: boolean) => Promise<void>;
+  archiveUpdates: Record<string, { saving: boolean; error?: string; saved?: boolean }>;
+  archiveFeedback: { message: string; error?: boolean } | null;
 }) {
   const [showPosted, setShowPosted] = useState(false);
-  const activeContent = content.filter((item) => item.status !== "Posted");
-  const postedContent = content.filter((item) => item.status === "Posted");
-  const visibleContent = showPosted ? content : activeContent;
+  const activeContent = content.filter((item) => !item.archivedAt && item.status !== "Posted");
+  const postedContent = content.filter((item) => !item.archivedAt && item.status === "Posted");
+  const removedContent = content.filter((item) => Boolean(item.archivedAt));
+  const visibleContent = showPosted ? [...activeContent, ...postedContent] : activeContent;
 
   if (content.length === 0) {
     return (
@@ -695,13 +774,22 @@ function ProductionBoard({
           </button>
         )}
       </div>
+      {archiveFeedback && (
+        <p
+          className={archiveFeedback.error ? "archive-feedback error" : "archive-feedback"}
+          role={archiveFeedback.error ? "alert" : "status"}
+          aria-live="polite"
+        >
+          {archiveFeedback.message}
+        </p>
+      )}
       <div className="production-list">
         {visibleContent.length === 0 && (
           <div className="production-clear">
             <span className="empty-line" />
             <p className="section-label">Workbench clear</p>
-            <h2>Everything here has been posted.</h2>
-            <p>Generate the next package from Saves Inbox. Your phone-published posts appear in Performance after the next Instagram sync.</p>
+            <h2>{postedContent.length > 0 ? "Everything here has been posted." : "No active production drafts."}</h2>
+            <p>{removedContent.length > 0 && postedContent.length === 0 ? "Restore a removed draft below or generate the next package from Saves Inbox." : "Generate the next package from Saves Inbox. Your phone-published posts appear in Performance after the next Instagram sync."}</p>
           </div>
         )}
         {visibleContent.map((item) => {
@@ -712,6 +800,7 @@ function ProductionBoard({
             (hook) => hook !== item.selectedOnScreenHook,
           );
           const statusUpdate = statusUpdates[item.id];
+          const archiveUpdate = archiveUpdates[item.id];
           const isVideo = item.format === "Yap Reel" || item.format === "Mini Story" || item.format === "POV / Realization";
           const isCarousel = item.format === "Carousel";
           const openingLabel = isVideo ? "Recommended spoken hook" : "Recommended opening line";
@@ -722,11 +811,31 @@ function ProductionBoard({
           const bodyInstruction = isVideo ? "Follow the ideas in order and explain them in your own words" : "Develop these ideas in order while keeping Mario’s exact voice";
 
           return <article className="production-item" key={item.id}>
-            <div className="production-meta">
-              <span>{item.format}</span>
-              <span>{item.goal}</span>
-              <span>{item.testVariable} test</span>
+            <div className="production-item-heading">
+              <div className="production-meta">
+                <span>{item.format}</span>
+                <span>{item.goal}</span>
+                <span>{item.testVariable} test</span>
+              </div>
+              {item.status !== "Posted" && (
+                <button
+                  type="button"
+                  className="remove-production-action"
+                  disabled={archiveUpdate?.saving}
+                  onClick={() => void onArchiveChange(item.id, true)}
+                  aria-describedby={`archive-message-${item.id}`}
+                >
+                  {archiveUpdate?.saving ? "Removing…" : "Remove from Production"}
+                </button>
+              )}
             </div>
+            <span
+              id={`archive-message-${item.id}`}
+              className={archiveUpdate?.error ? "archive-item-message error" : "archive-item-message"}
+              role={archiveUpdate?.error ? "alert" : "status"}
+            >
+              {archiveUpdate?.error ?? ""}
+            </span>
             <h2>{item.title}</h2>
             <div className="selected-hooks" aria-label="Selected opening">
               <div className="selected-hook spoken">
@@ -850,6 +959,43 @@ function ProductionBoard({
           </article>;
         })}
       </div>
+      {removedContent.length > 0 && (
+        <details className="removed-drafts">
+          <summary>
+            <span>Removed drafts</span>
+            <strong>{removedContent.length}</strong>
+          </summary>
+          <div className="removed-draft-list">
+            {removedContent.map((item) => {
+              const archiveUpdate = archiveUpdates[item.id];
+              return (
+                <div className="removed-draft" key={item.id}>
+                  <div>
+                    <span>{item.format} · {item.status}</span>
+                    <strong>{item.title}</strong>
+                    <small>
+                      Removed {item.archivedAt ? formatDate(item.archivedAt) : "from Production"}
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary-action restore-production-action"
+                    disabled={archiveUpdate?.saving}
+                    onClick={() => void onArchiveChange(item.id, false)}
+                  >
+                    {archiveUpdate?.saving ? "Restoring…" : "Restore"}
+                  </button>
+                  {archiveUpdate?.error && (
+                    <p className="archive-item-message error" role="alert">
+                      {archiveUpdate.error}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      )}
     </section>
   );
 }
@@ -1245,6 +1391,14 @@ function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
     "Life Story",
   ];
 
+  function sourceOrigin(source: BrandSourceInventory) {
+    const externalId = source.sourceExternalId ?? "";
+    const productionMatch = externalId.match(/^content-production:(\d+)/);
+    if (productionMatch) return `Content Production · ${productionMatch[1].padStart(2, "0")}`;
+    if (externalId.startsWith("story-bank:")) return "Story Bank · Daily Entries";
+    return source.sourceType;
+  }
+
   return (
     <section className="brand-layout stagger-in">
       <div className="brand-thesis">
@@ -1279,7 +1433,7 @@ function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
         {sources.length === 0 ? <p>No sources are available.</p> : sources.map((source) => (
           <article key={source.id}>
             <div>
-              <span>{source.sourceType}</span>
+              <span>{sourceOrigin(source)}</span>
               <strong>{source.title}</strong>
               <p>{source.coreTruth}</p>
             </div>

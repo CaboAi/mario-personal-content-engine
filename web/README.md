@@ -35,12 +35,12 @@ Analysis intentionally requires human-observed notes from the actual post; a Ree
 The source and format are separate decisions: the selected source controls what the post is about; the selected format controls whether it becomes a Yap Reel, Mini Story, POV / Realization, Carousel, Written Post, or Long-form package.
 
 Verified Mario-owned source material is copied into Supabase with `pnpm seed:sources`.
-The seed is idempotent and the dashboard does not read Notion during analysis or generation.
+The seed is idempotent and the dashboard does not read Notion during analysis or generation. The initial inventory is sourced from `brand-knowledge/05_STORY_BANK.md` (including its Daily Entry receipts) and Mario's existing Content Production database. Only developed material that Mario already authored is marked `Clear` + `Verified`; privacy-sensitive Story Bank entries remain unavailable until Mario confirms them. The Brand System shows each source's origin so the inventory is auditable.
 
 ## Performance and publishing
 
 - The authenticated **Import existing posts** action imports Mario's published Instagram media, available lifetime media insights, and up to 90 days of available account-level series into Supabase. Re-running it is idempotent.
-- Production is a phone-first active workbench. Marking an item `Posted` archives it from the default view; posted packages remain recoverable through the collapsed archive. No Instagram Media ID is required. The next Instagram sync brings phone-published posts into the existing-post library.
+- Production is a phone-first, one-project-at-a-time workbench. Marking an item `Posted` archives it from the default view; **Remove from Production** parks an unfinished draft in a recoverable archive. No Instagram Media ID is required. The next Instagram sync brings phone-published posts into the existing-post library and, when the caption provides enough evidence, proposes a dashboard-package match for Mario to confirm.
 - Performance is separated into account trends, the existing-post baseline, dashboard experiments, and winners/patterns. Historical lifetime totals are never presented as retroactive 24-hour or 7-day snapshots.
 - Edits-only Reel diagnostics—hook rate, skip rate, follower/non-follower split, and retention-curve notes—are entered manually per imported Reel. The dashboard does not infer them from views or average watch time.
 - Existing legacy connections can retain comparable 24-hour and 7-day review windows, but the normal Production workflow does not ask Mario for an Instagram Media ID.

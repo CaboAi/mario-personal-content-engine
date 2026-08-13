@@ -96,14 +96,29 @@ export async function listInstagramMedia(maxItems = 100) {
   let after: string | undefined;
   do {
     const query = new URLSearchParams({
-      fields: "id,media_type,media_product_type,permalink,timestamp",
+      fields: "id,caption,media_type,media_product_type,permalink,thumbnail_url,timestamp",
       limit: String(Math.min(50, maxItems - media.length)),
     });
     if (after) query.set("after", after);
-    const page = await metaRequest<{
+    type MediaPage = {
       data?: InstagramMediaRecord[];
       paging?: { cursors?: { after?: string }; next?: string };
-    }>(`${encodeURIComponent(accountId)}/media?${query}`);
+    };
+    let page: MediaPage;
+    try {
+      page = await metaRequest<MediaPage>(`${encodeURIComponent(accountId)}/media?${query}`);
+    } catch {
+      try {
+        // Preserve captions when only thumbnail access is unsupported.
+        query.set("fields", "id,caption,media_type,media_product_type,permalink,timestamp");
+        page = await metaRequest<MediaPage>(`${encodeURIComponent(accountId)}/media?${query}`);
+      } catch {
+        // Keep history sync useful when this account/API combination rejects optional
+        // descriptive fields. Existing match suggestions survive caption-less re-syncs.
+        query.set("fields", "id,media_type,media_product_type,permalink,timestamp");
+        page = await metaRequest<MediaPage>(`${encodeURIComponent(accountId)}/media?${query}`);
+      }
+    }
     media.push(...(page.data ?? []));
     after = page.paging?.next ? page.paging.cursors?.after : undefined;
   } while (after && media.length < maxItems);

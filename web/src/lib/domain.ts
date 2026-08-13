@@ -69,6 +69,8 @@ export type BrandSource = {
 
 export type BrandSourceInventory = BrandSource & {
   status: "Captured" | "Verified" | "Used" | "Retired";
+  sourceExternalId?: string;
+  createdAt?: string;
   updatedAt: string;
   usageCount: number;
 };
@@ -103,6 +105,7 @@ export type ContentPackage = {
   instagramPermalink?: string;
   mediaProductType?: string;
   postDate?: string;
+  archivedAt?: string | null;
   platforms: string[];
   createdAt: string;
 };
@@ -182,6 +185,11 @@ export type InstagramMediaItem = {
   retentionCurve?: Array<{ second: number; retention: number }>;
   lastSyncedAt: string;
   editsUpdatedAt?: string;
+  suggestedContentId?: string;
+  suggestedContentTitle?: string;
+  matchConfidence?: number;
+  matchReason?: string;
+  dismissedContentId?: string;
 };
 
 export type InstagramAccountDaily = {

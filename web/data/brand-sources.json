@@ -130,5 +130,115 @@
     "source_url": "https://app.notion.com/3b9714e215bf81e2b8c8db1f2661a3ba",
     "source_external_id": "content-production:17-failure-identity",
     "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "Nobody Wants You to Start Over",
+    "core_truth": "Starting over can be the moment you stop lying to yourself, not proof that you failed.",
+    "story_evidence": "Mario states that he had a career, money, and a title, lost them, moved to another country, and began rebuilding from scratch rather than returning to a life that no longer fit him.",
+    "privacy_status": "Clear",
+    "pillars": ["Reinvention", "Life Story"],
+    "source_url": "https://app.notion.com/3b4714e215bf81f69d91ed23b643ed03",
+    "source_external_id": "content-production:02-nobody-wants-you-to-start-over",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "Starting Over Is Embarrassing",
+    "core_truth": "Starting over in your thirties can feel embarrassing, but you are rebuilding with better information rather than returning to zero.",
+    "story_evidence": "Mario describes feeling as though he should already have his life together, then recognizes that what he learned from getting it wrong the first time comes with him into the rebuild.",
+    "privacy_status": "Clear",
+    "pillars": ["Reinvention", "Identity"],
+    "source_url": "https://app.notion.com/3b9714e215bf81c583dfe8741502850b",
+    "source_external_id": "content-production:11-starting-over-is-embarrassing",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "I Wasted Years Waiting to Feel Ready",
+    "core_truth": "Confidence usually arrives after action, not before it.",
+    "story_evidence": "Mario states that he spent years waiting to feel ready to move, start something new, put himself out there, and rebuild, then realized that readiness was never going to precede the first step.",
+    "privacy_status": "Clear",
+    "pillars": ["Action", "Responsibility"],
+    "source_url": "https://app.notion.com/3b9714e215bf81cb99d7c20620f842ed",
+    "source_external_id": "content-production:12-waiting-to-feel-ready",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "I Confused Relief With Peace",
+    "core_truth": "Relief that the pain stopped is not the same as liking the life you are building.",
+    "story_evidence": "Mario describes mistaking a calmer period for peace, then realizing that survival had made relief feel sufficient and that comfort was beginning to replace deliberate progress.",
+    "privacy_status": "Clear",
+    "pillars": ["Perspective", "Action"],
+    "source_url": "https://app.notion.com/3b9714e215bf81c7ad5feaa5aa3529c9",
+    "source_external_id": "content-production:13-relief-versus-peace",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "Losing Everything Changed What I Value",
+    "core_truth": "Loss strips away the decorations and makes what is actually valuable easier to see.",
+    "story_evidence": "Mario states that when his life fell apart, the job, money, opinions, plans, and timeline became less important than his people, health, word, and ability to respect himself.",
+    "privacy_status": "Clear",
+    "pillars": ["Perspective", "Life Story"],
+    "source_url": "https://app.notion.com/3b9714e215bf813badbecb4a5bb35702",
+    "source_external_id": "content-production:14-losing-everything-values",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "I Don't Want My Old Life Back",
+    "core_truth": "Rebuilding does not mean restoring an old identity; it means using what the old life taught you to build something better.",
+    "story_evidence": "Mario says he once thought rebuilding meant becoming his former self again, but now sees that version of himself as someone who tolerated, ignored, and delayed things he should not have.",
+    "privacy_status": "Clear",
+    "pillars": ["Identity", "Reinvention"],
+    "source_url": "https://app.notion.com/3b9714e215bf8180997eecff40862926",
+    "source_external_id": "content-production:15-dont-want-old-life-back",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "Accepting Yourself Can Become Bullshit",
+    "core_truth": "Self-acceptance without accountability can turn a changeable pattern into a protected excuse.",
+    "story_evidence": "Mario's existing production piece distinguishes loving yourself from defending patterns around money, effort, anger, and relationships that still need to change.",
+    "privacy_status": "Clear",
+    "pillars": ["Responsibility", "Self-Respect"],
+    "source_url": "https://app.notion.com/3b9714e215bf811bbf3cffc0e072df45",
+    "source_external_id": "content-production:16-acceptance-and-accountability",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "Nobody Is Coming to Start Your Life for You",
+    "core_truth": "The next chapter begins when you initiate it; no perfect opportunity or person can start it for you.",
+    "story_evidence": "Mario describes accepting that no email, opportunity, or person would arrive to tell him everything made sense and that he could begin. The required moves are concrete: send, meet, move, quit, start, and post.",
+    "privacy_status": "Clear",
+    "pillars": ["Action", "Responsibility"],
+    "source_url": "https://app.notion.com/3b9714e215bf81b7a3fff83bad2b3e01",
+    "source_external_id": "content-production:18-nobody-is-coming",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "What You Allow Becomes Your Life",
+    "core_truth": "Your real standards are revealed by what you repeatedly tolerate, including the promises and boundaries you break with yourself.",
+    "story_evidence": "Mario states that he used to think standards were what he demanded from other people, then recognized them as the disrespect, broken promises, ignored boundaries, and habits he repeatedly allowed.",
+    "privacy_status": "Clear",
+    "pillars": ["Standards", "Self-Respect"],
+    "source_url": "https://app.notion.com/3b9714e215bf81be8022c4f4475ec5a5",
+    "source_external_id": "content-production:19-what-you-allow",
+    "status": "Verified"
+  },
+  {
+    "source_type": "Existing Content",
+    "title": "It Can Always Be Worse",
+    "core_truth": "Perspective is not denial; as long as another honest action is available, the game is not over.",
+    "story_evidence": "Mario describes interrupting his own spirals by remembering that he can still decide, earn money back, rebuild, apologize, leave, or start again.",
+    "privacy_status": "Clear",
+    "pillars": ["Perspective", "Action"],
+    "source_url": "https://app.notion.com/3b9714e215bf81808a30c7440aab8ebc",
+    "source_external_id": "content-production:20-it-can-always-be-worse",
+    "status": "Verified"
   }
 ]
