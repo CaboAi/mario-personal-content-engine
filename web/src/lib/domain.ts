@@ -97,6 +97,8 @@ export type ContentPackage = {
   testVariable: "Hook" | "Topic" | "Length" | "Format" | "CTA" | "Visual" | "None";
   hypothesis: string;
   skeleton: string[];
+  fullScript?: string;
+  scriptRiskLines?: string[];
   closingLine: string;
   cta?: string;
   caption?: string;

@@ -40,7 +40,7 @@ export const contentPackageSchema = z
       (value) => /\bif\b[\s\S]*\bthen\b[\s\S]*\bbecause\b/i.test(value),
       "Hypothesis must use an if/then/because structure.",
     ),
-    skeleton: z.array(nonEmptyString).min(4),
+    skeleton: z.array(nonEmptyString).min(2),
     closingLine: nonEmptyString,
     cta: optionalString,
     caption: optionalString,
@@ -72,6 +72,14 @@ export const contentPackageSchema = z
         code: "custom",
         path: ["carouselSlides"],
         message: "Carousel packages require between 2 and 10 slides.",
+      });
+    }
+
+    if (content.format !== "POV / Realization" && content.skeleton.length < 4) {
+      context.addIssue({
+        code: "custom",
+        path: ["skeleton"],
+        message: "This format requires at least four outline beats.",
       });
     }
 

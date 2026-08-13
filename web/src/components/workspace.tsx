@@ -16,6 +16,7 @@ import type {
   SavedPost,
 } from "@/lib/domain";
 import { generatedDemoPackage } from "@/lib/demo-data";
+import { fullDraftKind, supportsFullDraft } from "@/lib/format-contracts";
 
 type View = "command" | "saves" | "production" | "performance" | "brand";
 
@@ -37,12 +38,12 @@ const productionStatuses: ProductionStatus[] = [
 ];
 
 const contentFormats: Array<{ id: ContentFormat; label: string; purpose: string }> = [
-  { id: "Yap Reel", label: "Yap Reel", purpose: "Direct argument to camera" },
-  { id: "Mini Story", label: "Mini Story", purpose: "Lived moment with a turn" },
-  { id: "POV / Realization", label: "POV / Realization", purpose: "Observation plus opinion" },
-  { id: "Carousel", label: "Carousel", purpose: "Swipeable visual essay" },
-  { id: "Written Post", label: "Written Post", purpose: "Caption-first argument" },
-  { id: "Long-form", label: "Long-form", purpose: "Deeper structured exploration" },
+  { id: "Yap Reel", label: "Yap Reel", purpose: "One direct argument to camera; optional full script later" },
+  { id: "Mini Story", label: "Mini Story", purpose: "A lived scene, turn, and realization; optional full script later" },
+  { id: "POV / Realization", label: "POV / Realization", purpose: "One sendable line with simple B-roll—intentionally lightweight" },
+  { id: "Carousel", label: "Carousel", purpose: "A complete swipeable visual essay with slide copy" },
+  { id: "Written Post", label: "Written Post", purpose: "A nuanced text post; optional full written draft later" },
+  { id: "Long-form", label: "Long-form", purpose: "A developed essay or longer spoken piece; optional full script later" },
 ];
 
 function suggestedFormat(contentType?: SavedPost["contentType"]): ContentFormat {
@@ -84,6 +85,9 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [archiveFeedback, setArchiveFeedback] = useState<
     { message: string; error?: boolean } | null
   >(null);
+  const [scriptUpdates, setScriptUpdates] = useState<
+    Record<string, { generating: boolean; error?: string }>
+  >({});
 
   const selectedSave = saves.find((save) => save.id === selectedSaveId);
   const selectedPairing = selectedSave?.pairings.find(
@@ -281,6 +285,48 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
     }
   }
 
+  async function generateScript(id: string, replace = false) {
+    const current = content.find((item) => item.id === id);
+    if (!current) return;
+    setScriptUpdates((updates) => ({ ...updates, [id]: { generating: true } }));
+    try {
+      let persisted: ContentPackage;
+      if (initialData.liveMode) {
+        const response = await fetch(`/api/content/${encodeURIComponent(id)}/script`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ replace }),
+        });
+        const result = await response.json().catch(() => ({
+          error: response.redirected
+            ? "Your dashboard session expired. Sign in again, then retry."
+            : "The server returned an unreadable response.",
+        }));
+        if (!response.ok || !result.content) {
+          throw new Error(result.error || "Script generation failed.");
+        }
+        persisted = result.content as ContentPackage;
+      } else {
+        await new Promise((resolve) => window.setTimeout(resolve, 350));
+        persisted = {
+          ...current,
+          fullScript: `${current.selectedHook}\n\nI kept treating readiness like permission. I thought certainty was supposed to arrive before the move. It did not.\n\nThe decisions that changed my life still felt uncertain when I made them. Confidence showed up after I moved, not before.\n\n${current.closingLine}`,
+          scriptRiskLines: [],
+        };
+      }
+      setContent((items) => items.map((item) => item.id === id ? { ...item, ...persisted } : item));
+      setScriptUpdates((updates) => ({ ...updates, [id]: { generating: false } }));
+    } catch (cause) {
+      setScriptUpdates((updates) => ({
+        ...updates,
+        [id]: {
+          generating: false,
+          error: cause instanceof Error ? cause.message : "Script generation failed.",
+        },
+      }));
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="side-rail">
@@ -374,6 +420,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
         {view === "production" && (
           <ProductionBoard
             content={content}
+            saves={saves}
             publications={publications}
             publishingConnected={initialData.publishingConnected}
             liveMode={initialData.liveMode}
@@ -388,6 +435,8 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             onArchiveChange={updateContentArchive}
             archiveUpdates={archiveUpdates}
             archiveFeedback={archiveFeedback}
+            onGenerateScript={generateScript}
+            scriptUpdates={scriptUpdates}
           />
         )}
 
@@ -725,6 +774,7 @@ function DetailBlock({ label, text }: { label: string; text: string }) {
 
 function ProductionBoard({
   content,
+  saves,
   publications,
   publishingConnected,
   liveMode,
@@ -734,8 +784,11 @@ function ProductionBoard({
   onArchiveChange,
   archiveUpdates,
   archiveFeedback,
+  onGenerateScript,
+  scriptUpdates,
 }: {
   content: ContentPackage[];
+  saves: SavedPost[];
   publications: CarouselPublication[];
   publishingConnected: boolean;
   liveMode: boolean;
@@ -745,8 +798,11 @@ function ProductionBoard({
   onArchiveChange: (id: string, archived: boolean) => Promise<void>;
   archiveUpdates: Record<string, { saving: boolean; error?: string; saved?: boolean }>;
   archiveFeedback: { message: string; error?: boolean } | null;
+  onGenerateScript: (id: string, replace?: boolean) => Promise<void>;
+  scriptUpdates: Record<string, { generating: boolean; error?: string }>;
 }) {
   const [showPosted, setShowPosted] = useState(false);
+  const [copiedScriptId, setCopiedScriptId] = useState<string | null>(null);
   const activeContent = content.filter((item) => !item.archivedAt && item.status !== "Posted");
   const postedContent = content.filter((item) => !item.archivedAt && item.status === "Posted");
   const removedContent = content.filter((item) => Boolean(item.archivedAt));
@@ -801,14 +857,18 @@ function ProductionBoard({
           );
           const statusUpdate = statusUpdates[item.id];
           const archiveUpdate = archiveUpdates[item.id];
+          const scriptUpdate = scriptUpdates[item.id];
+          const sourceSave = saves.find((save) => save.id === item.sourceSaveId);
+          const sourcePairing = sourceSave?.pairings.find((pairing) => pairing.sourceTitle === item.sourceTitle);
           const isVideo = item.format === "Yap Reel" || item.format === "Mini Story" || item.format === "POV / Realization";
           const isCarousel = item.format === "Carousel";
+          const isLongForm = item.format === "Long-form";
           const openingLabel = isVideo ? "Recommended spoken hook" : "Recommended opening line";
           const openingInstruction = isVideo ? "Say this first" : isCarousel ? "Use this as the first-slide thought" : "Open the written piece with this";
           const visualLabel = isVideo ? "On-screen hook" : isCarousel ? "Carousel cover hook" : "Headline / first-frame hook";
           const visualInstruction = isVideo ? "Show this text during the opening" : isCarousel ? "Use this on the cover or first slide" : "Use this as the title or visual opener";
-          const bodyLabel = isVideo ? "Talking prompts—not a script" : isCarousel ? "Carousel argument outline" : "Writing outline—not finished prose";
-          const bodyInstruction = isVideo ? "Follow the ideas in order and explain them in your own words" : "Develop these ideas in order while keeping Mario’s exact voice";
+          const bodyLabel = isVideo ? "Talking prompts—not a script" : isCarousel ? "Carousel argument outline" : isLongForm ? "Long-form development outline—not a finished draft" : "Writing outline—not finished prose";
+          const bodyInstruction = isVideo ? "Follow the ideas in order and explain them in your own words" : isLongForm ? "Use these sections to develop the argument; short-Reel production directions do not belong here" : "Develop these ideas in order while keeping Mario’s exact voice";
 
           return <article className="production-item" key={item.id}>
             <div className="production-item-heading">
@@ -836,6 +896,30 @@ function ProductionBoard({
             >
               {archiveUpdate?.error ?? ""}
             </span>
+            <div className="production-provenance" aria-label="Content sources">
+              <section>
+                <p className="section-label">Mario-owned substance</p>
+                <strong>{item.sourceTitle}</strong>
+                <span>The story, opinion, and lesson come from this verified Mario source.</span>
+                {sourcePairing?.sourceUrl && <a href={sourcePairing.sourceUrl} target="_blank" rel="noreferrer">Open Mario source</a>}
+              </section>
+              <section>
+                <p className="section-label">Delivery influence from Saves Inbox</p>
+                {sourceSave ? <>
+                  <strong>{sourceSave.author.startsWith("@") ? sourceSave.author : `@${sourceSave.author}`} · {sourceSave.contentType}</strong>
+                  <span>This creator influenced structure and presentation only—not the topic or message.</span>
+                  <div className="provenance-links"><a href={sourceSave.url} target="_blank" rel="noreferrer">Open saved post</a><span>Saved {formatDate(sourceSave.savedAt)}</span></div>
+                  <details>
+                    <summary>See exactly what influenced this package</summary>
+                    <dl>
+                      <div><dt>Framework</dt><dd>{sourceSave.frameworkDna}</dd></div>
+                      <div><dt>Hook mechanics</dt><dd>{sourceSave.hookMechanics}</dd></div>
+                      <div><dt>Visual pacing</dt><dd>{sourceSave.visualPacing}</dd></div>
+                    </dl>
+                  </details>
+                </> : <><strong>No saved-post link available</strong><span>The Mario source remains traceable above.</span></>}
+              </section>
+            </div>
             <h2>{item.title}</h2>
             <div className="selected-hooks" aria-label="Selected opening">
               <div className="selected-hook spoken">
@@ -849,6 +933,32 @@ function ProductionBoard({
                 <strong>{item.selectedOnScreenHook}</strong>
               </div>
             </div>
+            {supportsFullDraft(item.format) && item.status !== "Posted" && (
+              <section className={item.fullScript ? "full-script-panel generated" : "full-script-panel"}>
+                <div className="full-script-heading">
+                  <div>
+                    <p className="section-label">Optional {fullDraftKind(item.format)}</p>
+                    <h3>{item.fullScript ? "A word-for-word starting point" : "Stuck on what to say?"}</h3>
+                    <p>{item.fullScript ? "Read it, edit it, or use it to get moving. Keep the version that sounds most like you." : `Generate a complete ${fullDraftKind(item.format)} from this exact Mario source, opening, outline, and closing line.`}</p>
+                  </div>
+                  {!item.fullScript ? (
+                    <button type="button" className="primary-action" disabled={scriptUpdate?.generating} onClick={() => void onGenerateScript(item.id)}>
+                      {scriptUpdate?.generating ? "Writing…" : `Generate full ${fullDraftKind(item.format)}`}
+                    </button>
+                  ) : (
+                    <div className="script-actions">
+                      <button type="button" className="secondary-action" onClick={() => void navigator.clipboard.writeText(item.fullScript || "").then(() => setCopiedScriptId(item.id))}>{copiedScriptId === item.id ? "Copied" : "Copy"}</button>
+                      <button type="button" className="text-action" disabled={scriptUpdate?.generating} onClick={() => void onGenerateScript(item.id, true)}>{scriptUpdate?.generating ? "Rewriting…" : "Regenerate"}</button>
+                    </div>
+                  )}
+                </div>
+                {scriptUpdate?.error && <p className="inline-error" role="alert">{scriptUpdate.error}</p>}
+                {item.fullScript && <div className="full-script-copy">{item.fullScript.split(/\n{2,}/).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>}
+                {item.scriptRiskLines && item.scriptRiskLines.length > 0 && (
+                  <div className="script-risk-lines"><p className="section-label">Lines to make more natural</p><ul>{item.scriptRiskLines.map((line) => <li key={line}>{line}</li>)}</ul></div>
+                )}
+              </section>
+            )}
             <div className="production-sections">
               <section className="production-section alternatives">
                 <div>

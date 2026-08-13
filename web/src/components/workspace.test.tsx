@@ -45,6 +45,41 @@ describe("Production package instructions", () => {
     ).toBeTruthy();
   });
 
+  it("shows the Mario source and saved creator as two different influences", () => {
+    openProduction();
+
+    expect(screen.getByText("Mario-owned substance")).toBeTruthy();
+    expect(screen.getByText("You'll Never Be Ready")).toBeTruthy();
+    expect(screen.getByText("Delivery influence from Saves Inbox")).toBeTruthy();
+    expect(screen.getByText("@higherupwellness · Reel")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open saved post" }).getAttribute("href"))
+      .toBe(demoData.saves[0].url);
+    expect(screen.getByText(/structure and presentation only—not the topic or message/)).toBeTruthy();
+  });
+
+  it("offers and generates an optional full script when Mario is stuck", async () => {
+    openProduction();
+
+    expect(screen.getByText("Stuck on what to say?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Generate full script" }));
+
+    await waitFor(() => expect(screen.getByText("A word-for-word starting point")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Regenerate" })).toBeTruthy();
+  });
+
+  it("does not pad lightweight POV or carousel packages with a script", () => {
+    render(
+      <Workspace initialData={{
+        ...demoData,
+        content: [{ ...generatedDemoPackage, format: "POV / Realization" }],
+      }} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Production/ }));
+
+    expect(screen.queryByRole("button", { name: /Generate full/ })).toBeNull();
+  });
+
   it("keeps posted items out of the active workbench and removes Media ID linking", () => {
     render(
       <Workspace initialData={{

@@ -93,4 +93,17 @@ describe("generated content package validation", () => {
       carouselSlides: [{ headline: "One", body: "Body", altText: "Alt" }],
     })).toThrow("Only Carousel packages may include carousel slides.");
   });
+
+  it("allows a concise POV scaffold but keeps developed formats substantial", () => {
+    expect(contentPackageSchema.parse({
+      ...validPackage,
+      format: "POV / Realization",
+      skeleton: ["One sendable realization", "Simple B-roll direction"],
+    }).skeleton).toHaveLength(2);
+    expect(() => contentPackageSchema.parse({
+      ...validPackage,
+      format: "Long-form",
+      skeleton: ["Opening", "Resolution"],
+    })).toThrow("This format requires at least four outline beats.");
+  });
 });

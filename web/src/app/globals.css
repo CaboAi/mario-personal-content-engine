@@ -473,6 +473,34 @@ a { color: inherit; }
 .restore-production-action { min-height: 2.25rem; padding: .5rem .75rem; }
 .removed-draft > .archive-item-message { grid-column: 1 / -1; margin: 0; }
 
+.production-provenance { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr); margin: 1.2rem 0 1.8rem; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line); }
+.production-provenance > section { display: grid; align-content: start; gap: .4rem; padding: 1rem 1.2rem 1rem 0; }
+.production-provenance > section + section { padding-left: 1.2rem; border-left: 1px solid var(--line); }
+.production-provenance strong { font-size: .8rem; line-height: 1.35; }
+.production-provenance section > span, .production-provenance details, .production-provenance a { color: var(--muted); font-size: .62rem; line-height: 1.5; }
+.production-provenance a { width: fit-content; color: var(--accent-dark); }
+.provenance-links { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem; }
+.provenance-links span { color: var(--muted); font-family: var(--font-geist-mono), monospace; font-size: .55rem; }
+.production-provenance details { margin-top: .35rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+.production-provenance summary { width: fit-content; color: var(--accent-dark); cursor: pointer; font-weight: 600; }
+.production-provenance dl { display: grid; gap: .65rem; margin: .8rem 0 0; }
+.production-provenance dl > div { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .7rem; }
+.production-provenance dt { color: var(--ink); font-family: var(--font-geist-mono), monospace; font-size: .55rem; text-transform: uppercase; }
+.production-provenance dd { margin: 0; }
+
+.full-script-panel { display: grid; gap: 1rem; margin: 1.5rem 0; padding: 1.2rem 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line); }
+.full-script-panel.generated { padding: 1.4rem; border: 1px solid var(--line); border-left: 3px solid var(--accent); background: rgba(252, 251, 248, .68); }
+.full-script-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 1.5rem; }
+.full-script-heading h3 { margin: .25rem 0 0; font-size: 1.2rem; letter-spacing: -.035em; }
+.full-script-heading > div > p:last-child { max-width: 70ch; margin: .5rem 0 0; color: var(--muted); font-size: .68rem; line-height: 1.5; }
+.script-actions { display: flex; align-items: center; gap: .8rem; }
+.full-script-copy { max-width: 76ch; padding-top: 1rem; border-top: 1px solid var(--line); }
+.full-script-copy p { margin: 0 0 .9rem; font-size: .8rem; line-height: 1.7; }
+.full-script-copy p:last-child { margin-bottom: 0; font-weight: 600; }
+.script-risk-lines { max-width: 76ch; padding: .9rem 1rem; border-left: 2px solid var(--accent); background: rgba(156, 117, 53, .06); }
+.script-risk-lines ul { display: grid; gap: .35rem; margin: .6rem 0 0; padding-left: 1rem; }
+.script-risk-lines li { color: var(--muted); font-size: .65rem; line-height: 1.45; }
+
 .carousel-plan { margin-top: 1.5rem; border-top: 1px solid var(--ink); }
 .carousel-plan .panel-heading > span, .source-inventory .panel-heading > span { color: var(--muted); font-family: var(--font-geist-mono), monospace; font-size: .62rem; }
 .carousel-plan ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .7rem; margin: 0; padding: 0; list-style: none; }
@@ -663,6 +691,14 @@ a { color: inherit; }
   .status-control select { width: 100%; }
   .removed-draft { grid-template-columns: 1fr; }
   .restore-production-action { width: 100%; }
+  .production-provenance, .full-script-heading { grid-template-columns: 1fr; }
+  .production-provenance > section { padding: 1rem 0; }
+  .production-provenance > section + section { padding-left: 0; border-top: 1px solid var(--line); border-left: 0; }
+  .production-provenance dl > div { grid-template-columns: 1fr; gap: .25rem; }
+  .full-script-panel.generated { padding: 1rem; }
+  .full-script-heading button, .script-actions { width: 100%; }
+  .script-actions { align-items: stretch; flex-direction: column; }
+  .script-actions button { width: 100%; }
   .metric-table { overflow-x: auto; }
   .metric-table-head, .metric-table-row { min-width: 40rem; }
   .performance-summary { grid-template-columns: 1fr; }
