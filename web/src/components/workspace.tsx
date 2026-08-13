@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type {
   BrandSourceInventory,
-  CarouselPublication,
   ContentFormat,
   ContentPackage,
   DashboardData,
@@ -28,7 +27,7 @@ const views: Array<{ id: View; label: string; index: string }> = [
   { id: "brand", label: "Brand System", index: "05" },
 ];
 
-const productionStatuses: ProductionStatus[] = [
+const videoAndWritingStatuses: ProductionStatus[] = [
   "Script Ready",
   "Ready to Record",
   "Recorded",
@@ -36,6 +35,17 @@ const productionStatuses: ProductionStatus[] = [
   "Scheduled",
   "Posted",
 ];
+
+const carouselStatuses: ProductionStatus[] = [
+  "Copy Ready",
+  "Designing in Canva",
+  "Design Ready",
+  "Posted",
+];
+
+function productionStatusesFor(format: ContentFormat) {
+  return format === "Carousel" ? carouselStatuses : videoAndWritingStatuses;
+}
 
 const contentFormats: Array<{ id: ContentFormat; label: string; purpose: string }> = [
   { id: "Yap Reel", label: "Yap Reel", purpose: "One direct argument to camera; optional full script later" },
@@ -64,7 +74,6 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [view, setView] = useState<View>("command");
   const [saves, setSaves] = useState(initialData.saves);
   const [content, setContent] = useState(initialData.content);
-  const [publications, setPublications] = useState(initialData.publications);
   const [selectedSaveId, setSelectedSaveId] = useState(initialData.saves[0]?.id);
   const [selectedPairingId, setSelectedPairingId] = useState<string | undefined>(
     initialData.saves[0]?.pairings.find((pairing) => pairing.recommended)?.id,
@@ -95,7 +104,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   );
   const reviewCount = saves.filter((save) => save.status === "Needs Review").length;
   const readyCount = content.filter(
-    (item) => !item.archivedAt && item.status === "Script Ready",
+    (item) => !item.archivedAt && (item.status === "Script Ready" || item.status === "Copy Ready"),
   ).length;
   const inventoryCount = content.filter(
     (item) => !item.archivedAt && item.status !== "Posted",
@@ -421,15 +430,6 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
           <ProductionBoard
             content={content}
             saves={saves}
-            publications={publications}
-            publishingConnected={initialData.publishingConnected}
-            liveMode={initialData.liveMode}
-            onPublicationChange={(updated) =>
-              setPublications((items) => [
-                updated,
-                ...items.filter((item) => item.contentId !== updated.contentId),
-              ])
-            }
             onStatusChange={updateProductionStatus}
             statusUpdates={statusUpdates}
             onArchiveChange={updateContentArchive}
@@ -492,7 +492,7 @@ function CommandCenter({
 
       <div className="metric-ribbon" aria-label="Workflow summary">
         <Metric value={reviewCount} label="Needs review" />
-        <Metric value={readyCount} label="Scripts ready" />
+        <Metric value={readyCount} label="Ready to make" />
         <Metric value={inventoryCount} label="Active inventory" />
       </div>
 
@@ -775,10 +775,6 @@ function DetailBlock({ label, text }: { label: string; text: string }) {
 function ProductionBoard({
   content,
   saves,
-  publications,
-  publishingConnected,
-  liveMode,
-  onPublicationChange,
   onStatusChange,
   statusUpdates,
   onArchiveChange,
@@ -789,10 +785,6 @@ function ProductionBoard({
 }: {
   content: ContentPackage[];
   saves: SavedPost[];
-  publications: CarouselPublication[];
-  publishingConnected: boolean;
-  liveMode: boolean;
-  onPublicationChange: (publication: CarouselPublication) => void;
   onStatusChange: (id: string, status: ProductionStatus) => Promise<void>;
   statusUpdates: Record<string, { saving: boolean; error?: string; saved?: boolean }>;
   onArchiveChange: (id: string, archived: boolean) => Promise<void>;
@@ -1025,7 +1017,7 @@ function ProductionBoard({
                 )}
               </div>
               <div className="status-control">
-                <label htmlFor={`status-${item.id}`}>Production status</label>
+                <label htmlFor={`status-${item.id}`}>{isCarousel ? "Carousel status" : "Production status"}</label>
                 <select
                   id={`status-${item.id}`}
                   value={item.status}
@@ -1035,7 +1027,7 @@ function ProductionBoard({
                     void onStatusChange(item.id, event.target.value as ProductionStatus)
                   }
                 >
-                  {productionStatuses.map((status) => (
+                  {productionStatusesFor(item.format).map((status) => (
                     <option key={status}>{status}</option>
                   ))}
                 </select>
@@ -1057,13 +1049,7 @@ function ProductionBoard({
             </div>
             {item.format === "Carousel" && (
               <div className="distribution-tools">
-                <CarouselPublisher
-                  item={item}
-                  publication={publications.find((job) => job.contentId === item.id)}
-                  connected={publishingConnected}
-                  liveMode={liveMode}
-                  onPublicationChange={onPublicationChange}
-                />
+                <CanvaHandoff item={item} />
               </div>
             )}
           </article>;
@@ -1110,103 +1096,86 @@ function ProductionBoard({
   );
 }
 
-function CarouselPublisher({
-  item,
-  publication,
-  connected,
-  liveMode,
-  onPublicationChange,
-}: {
-  item: ContentPackage;
-  publication?: CarouselPublication;
-  connected: boolean;
-  liveMode: boolean;
-  onPublicationChange: (publication: CarouselPublication) => void;
-}) {
-  const [assetUrls, setAssetUrls] = useState<string[]>(
-    publication?.assetUrls.length ? publication.assetUrls : item.carouselSlides.map(() => ""),
-  );
-  const [caption, setCaption] = useState(publication?.caption ?? item.caption ?? "");
-  const [confirmed, setConfirmed] = useState(false);
-  const [busy, setBusy] = useState<"validate" | "publish" | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const altTexts = item.carouselSlides.map((slide) => slide.altText);
-  const currentStatus = publication?.status ?? "Draft";
+function CanvaHandoff({ item }: { item: ContentPackage }) {
+  const [copiedPart, setCopiedPart] = useState<string | null>(null);
 
-  function updateAsset(index: number, value: string) {
-    setAssetUrls((values) => values.map((current, currentIndex) => currentIndex === index ? value : current));
-  }
-
-  async function validateAssets() {
-    setBusy("validate");
-    setMessage(null);
+  const copyText = async (label: string, text: string) => {
     try {
-      if (!liveMode) throw new Error("Supabase is required to validate carousel assets.");
-      const response = await fetch(`/api/carousels/${encodeURIComponent(item.id)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assetUrls, altTexts, caption }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Carousel validation failed.");
-      onPublicationChange(result.publication);
-      setMessage("Assets validated. Review every slide before enabling publish.");
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Carousel validation failed.");
-    } finally {
-      setBusy(null);
+      await navigator.clipboard.writeText(text);
+      setCopiedPart(label);
+    } catch {
+      setCopiedPart("error");
     }
-  }
+  };
 
-  async function publishCarousel() {
-    setBusy("publish");
-    setMessage(null);
-    try {
-      const response = await fetch(`/api/carousels/${encodeURIComponent(item.id)}/publish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmed: true }),
-      });
-      const result = await response.json();
-      if (!response.ok && response.status !== 202) throw new Error(result.error || "Carousel publishing failed.");
-      if (result.publication) onPublicationChange(result.publication);
-      setMessage(result.message || "Carousel published to Instagram.");
-      setConfirmed(false);
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Carousel publishing failed.");
-    } finally {
-      setBusy(null);
-    }
-  }
+  const allCopy = [
+    `CAROUSEL: ${item.title}`,
+    ...item.carouselSlides.map((slide, index) =>
+      `SLIDE ${index + 1}${index === 0 ? " (COVER)" : ""}\n${slide.headline}\n${slide.body}`,
+    ),
+    item.caption ? `INSTAGRAM CAPTION\n${item.caption}` : null,
+  ].filter(Boolean).join("\n\n");
 
   return (
-    <section className="distribution-card carousel-publisher">
+    <section className="distribution-card canva-handoff">
       <div className="distribution-heading">
-        <div><p className="section-label">Carousel publisher</p><h3>Validate, review, then publish</h3></div>
-        <StatusPill status={currentStatus} />
+        <div>
+          <p className="section-label">Canva handoff</p>
+          <h3>Copy, design in Canva, then post from your phone</h3>
+        </div>
+        <span className="handoff-stage">{item.carouselSlides.length} slides</span>
       </div>
-      <p>Use public HTTPS JPEG URLs. Nothing is sent to Meta until the final confirmed button is clicked.</p>
-      <div className="asset-list">
-        {item.carouselSlides.map((slide, index) => (
-          <label key={`${item.id}-asset-${index}`}>
-            <span>Slide {index + 1}: {slide.headline}</span>
-            <input type="url" value={assetUrls[index] ?? ""} onChange={(event) => updateAsset(index, event.target.value)} placeholder="https://…/slide.jpg" />
-            <small>Alt text: {slide.altText}</small>
-          </label>
-        ))}
+      <p>The dashboard supplies the finished slide copy and caption. Canva handles the reusable visual template; Instagram handles publishing.</p>
+
+      <div className="canva-actions">
+        <button type="button" className="primary-action" onClick={() => void copyText("all", allCopy)}>
+          {copiedPart === "all" ? "Copied for Canva" : "Copy all for Canva"}
+        </button>
+        {item.caption && (
+          <button type="button" className="secondary-action" onClick={() => void copyText("caption", item.caption || "")}>
+            {copiedPart === "caption" ? "Caption copied" : "Copy caption"}
+          </button>
+        )}
       </div>
-      <label className="caption-field"><span>Instagram caption</span><textarea rows={5} value={caption} onChange={(event) => setCaption(event.target.value)} /></label>
-      <div className="publisher-actions">
-        <button type="button" className="secondary-action" disabled={busy !== null || assetUrls.some((url) => !url)} onClick={() => void validateAssets()}>{busy === "validate" ? "Validating…" : "Validate assets"}</button>
-        <label className="publish-confirmation">
-          <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={currentStatus !== "Validated" && currentStatus !== "Processing"} />
-          <span>I reviewed every image, alt text, order, and caption.</span>
-        </label>
-        <button type="button" className="primary-action publish-action" disabled={!connected || !confirmed || busy !== null || (currentStatus !== "Validated" && currentStatus !== "Processing")} onClick={() => void publishCarousel()}>{busy === "publish" ? "Sending to Meta…" : connected ? "Publish carousel to Instagram" : "Connect Meta to publish"}</button>
+
+      <ol className="canva-slide-copy" aria-label="Carousel copy for Canva">
+        {item.carouselSlides.map((slide, index) => {
+          const slideLabel = `slide-${index + 1}`;
+          return (
+            <li key={`${item.id}-canva-${index}`}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <strong>{slide.headline}</strong>
+                <p>{slide.body}</p>
+                <small>Draft alt text: {slide.altText}</small>
+              </div>
+              <button
+                type="button"
+                className="text-action"
+                onClick={() => void copyText(slideLabel, `${slide.headline}\n${slide.body}`)}
+              >
+                {copiedPart === slideLabel ? "Copied" : `Copy slide ${index + 1}`}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="handoff-checklist">
+        <p className="section-label">Finish in Canva</p>
+        <ol>
+          <li>Open your reusable carousel template.</li>
+          <li>Paste the copy and adjust line breaks for mobile readability.</li>
+          <li>Keep one visual spine across the slides and one job per slide.</li>
+          <li>Review the final visuals, then correct the draft alt text if needed.</li>
+          <li>Export the slides in order and post them from your phone.</li>
+          <li>Return here and mark the carousel Posted.</li>
+        </ol>
       </div>
-      {message && <p className="operation-message" role="status">{message}</p>}
-      {publication?.instagramPermalink && <a href={publication.instagramPermalink} target="_blank" rel="noreferrer">Open published carousel</a>}
-      {publication?.lastError && <p className="operation-message error" role="alert">{publication.lastError}</p>}
+
+      <p className={copiedPart === "error" ? "operation-message error" : "copy-status"} role="status" aria-live="polite">
+        {copiedPart === "error" ? "Clipboard access failed. Select and copy the slide text above." : copiedPart ? "Ready to paste into Canva." : "Nothing is published or sent to Meta from this section."}
+      </p>
     </section>
   );
 }

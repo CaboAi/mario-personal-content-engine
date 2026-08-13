@@ -12,6 +12,9 @@ export type ProductionStatus =
   | "Recorded"
   | "Edited"
   | "Scheduled"
+  | "Copy Ready"
+  | "Designing in Canva"
+  | "Design Ready"
   | "Posted";
 
 export type ContentFormat =

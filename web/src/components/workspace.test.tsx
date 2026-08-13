@@ -182,7 +182,12 @@ describe("Production package instructions", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy());
   });
 
-  it("keeps carousel publishing behind asset validation and explicit review", () => {
+  it("hands carousel copy to Canva without exposing Meta publishing controls", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
     render(
       <Workspace
         initialData={{
@@ -190,6 +195,8 @@ describe("Production package instructions", () => {
           content: [{
             ...generatedDemoPackage,
             format: "Carousel",
+            status: "Copy Ready",
+            caption: "Build before confidence arrives.",
             carouselSlides: [
               { headline: "Start", body: "The opening", altText: "Opening slide" },
               { headline: "Finish", body: "The close", altText: "Closing slide" },
@@ -200,15 +207,50 @@ describe("Production package instructions", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Production/ }));
 
-    expect(screen.getByText("Carousel publisher")).toBeTruthy();
+    expect(screen.getByText("Canva handoff")).toBeTruthy();
+    expect(screen.getByText("Copy, design in Canva, then post from your phone")).toBeTruthy();
     expect(screen.getByText("Recommended opening line")).toBeTruthy();
     expect(screen.getByText("Carousel cover hook")).toBeTruthy();
     expect(screen.getByText("Carousel argument outline")).toBeTruthy();
     expect(screen.getByText("Final slide line")).toBeTruthy();
-    expect(screen.getByText(/Nothing is sent to Meta/)).toBeTruthy();
-    expect(
-      (screen.getByRole("button", { name: "Connect Meta to publish" }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect(screen.getByText(/Nothing is published or sent to Meta/)).toBeTruthy();
+    expect(screen.queryByPlaceholderText("https://…/slide.jpg")).toBeNull();
+    expect(screen.queryByRole("button", { name: /publish carousel/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy all for Canva" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toContain("SLIDE 1 (COVER)\nStart\nThe opening");
+    expect(writeText.mock.calls[0][0]).toContain("INSTAGRAM CAPTION\nBuild before confidence arrives.");
+    expect(screen.getByRole("button", { name: "Copied for Canva" })).toBeTruthy();
+  });
+
+  it("uses a design workflow for carousels instead of video recording statuses", () => {
+    render(
+      <Workspace
+        initialData={{
+          ...demoData,
+          content: [{
+            ...generatedDemoPackage,
+            format: "Carousel",
+            status: "Copy Ready",
+            carouselSlides: [
+              { headline: "Start", body: "The opening", altText: "Opening slide" },
+              { headline: "Finish", body: "The close", altText: "Closing slide" },
+            ],
+          }],
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Production/ }));
+
+    const status = screen.getByLabelText("Carousel status") as HTMLSelectElement;
+    expect(Array.from(status.options).map((option) => option.value)).toEqual([
+      "Copy Ready",
+      "Designing in Canva",
+      "Design Ready",
+      "Posted",
+    ]);
+    expect(screen.queryByRole("option", { name: "Ready to Record" })).toBeNull();
   });
 });
 

@@ -11,6 +11,9 @@ const productionStatusSchema = z.enum([
   "Recorded",
   "Edited",
   "Scheduled",
+  "Copy Ready",
+  "Designing in Canva",
+  "Design Ready",
   "Posted",
 ] satisfies ProductionStatus[]);
 

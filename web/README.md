@@ -28,7 +28,7 @@ The complete environment-variable checklist, deployment flow, local bridge hando
 
 ## Workflow
 
-`Instagram Save → inspect delivery mechanics → choose one Mario source → choose output format → Production → publish/link → 24-hour + 7-day review`
+`Instagram Save → inspect delivery mechanics → choose one Mario source → choose output format → Production → post from phone → Instagram sync → performance review`
 
 Saved posts contribute delivery DNA only. A verified Mario source supplies the story, opinion, and lesson.
 Analysis intentionally requires human-observed notes from the actual post; a Reel or Carousel is never analyzed from its caption alone.
@@ -48,5 +48,5 @@ The seed is idempotent and the dashboard does not read Notion during analysis or
 - Existing legacy connections can retain comparable 24-hour and 7-day review windows, but the normal Production workflow does not ask Mario for an Instagram Media ID.
 - The daily Vercel job captures due owned-media insights once Meta is configured. Missing Meta values remain unavailable and retry later; they are never converted to zero.
 - A signal needs at least five comparable same-goal, same-window posts. A signal is a comparison, not a winner declaration or a durable brand learning.
-- Carousel publishing requires 2–10 public HTTPS JPEG assets, matching alt text, validation, a human review checkbox, and an explicit publish click. The scheduler never publishes content automatically.
+- Carousel packages move through `Copy Ready → Designing in Canva → Design Ready → Posted`. The Canva handoff copies the complete slide sequence and caption, keeps draft alt text visible for final review, and provides a short design/export checklist. The normal dashboard workflow does not upload carousel assets or publish them to Meta.
 - The Brand System reads its live source inventory directly from Supabase. Notion is not required.
