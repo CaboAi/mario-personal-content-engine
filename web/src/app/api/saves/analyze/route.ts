@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { BrandSource, SavedPost } from "@/lib/domain";
-import { analyzeSavedPost } from "@/lib/save-analysis";
+import type { SavedPost } from "@/lib/domain";
+import { analyzeAndPersistSave } from "@/lib/save-analysis-service";
 import { isLiveMode, supabaseRequest } from "@/lib/supabase-rest";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const requestSchema = z.object({
   saveId: z.string().uuid(),
-  inspectionNotes: z.string().trim().min(40).max(20_000),
+  inspectionNotes: z.string().trim().max(2_000).optional().default(""),
 }).strict();
 
 export async function POST(request: Request) {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try { decoded = JSON.parse(raw); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
   const parsed = requestSchema.safeParse(decoded);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Add at least 40 characters of observable notes from the actual post." }, { status: 400 });
+    return NextResponse.json({ error: "Optional context must be 2,000 characters or fewer." }, { status: 400 });
   }
 
   const saves = await supabaseRequest<SavedPost[]>(
@@ -36,44 +36,22 @@ export async function POST(request: Request) {
   if (!save) return NextResponse.json({ error: "Save not found." }, { status: 404 });
   if (save.status === "Used") return NextResponse.json({ error: "This save already has a production item." }, { status: 409 });
 
-  const sourceRows = await supabaseRequest<Array<{
-    id: string; source_type: BrandSource["sourceType"]; title: string; core_truth: string;
-    story_evidence: string; privacy_status: BrandSource["privacyStatus"]; pillars: string[];
-    source_url?: string; status: string;
-  }>>("brand_sources?status=eq.Verified&privacy_status=eq.Clear&select=*&order=created_at.desc&limit=50");
-  const recommendationRows = await supabaseRequest<Array<{
-    brand_source_id: string; recommended: boolean; created_at: string;
-  }>>("pairings?select=brand_source_id,recommended,created_at&order=created_at.desc&limit=200");
-  const sources: Array<BrandSource & { usageCount: number; recommendationCount: number; recentlyRecommended: boolean }> = sourceRows.map((source) => {
-    const history = recommendationRows.filter((pairing) => pairing.brand_source_id === source.id);
-    return ({
-    id: source.id,
-    sourceType: source.source_type,
-    title: source.title,
-    coreTruth: source.core_truth,
-    storyEvidence: source.story_evidence,
-    privacyStatus: source.privacy_status,
-    pillars: source.pillars,
-    sourceUrl: source.source_url,
-    usageCount: history.length,
-    recommendationCount: history.filter((pairing) => pairing.recommended).length,
-    recentlyRecommended: history.some((pairing) => pairing.recommended && Date.now() - new Date(pairing.created_at).getTime() < 14 * 86_400_000),
-  });
-  });
-  if (!sources.length) {
-    return NextResponse.json({ error: "No Clear and Verified Mario-owned sources are available." }, { status: 409 });
+  const canUseCaptionOnly = save.contentType === "Post" && Boolean(save.caption.trim());
+  const hasManualFallback = parsed.data.inspectionNotes.length >= 40;
+  if (save.status === "New" && !canUseCaptionOnly && !hasManualFallback) {
+    return NextResponse.json(
+      { error: "This visual post needs the local automatic media inspection. Run the Instagram sync, or add detailed notes only as a fallback." },
+      { status: 409 },
+    );
   }
 
   try {
-    const analysis = await analyzeSavedPost(save, parsed.data.inspectionNotes, sources);
-    const rows = await supabaseRequest<SavedPost[]>("rpc/apply_save_analysis", {
-      method: "POST",
-      body: JSON.stringify({
-        p_saved_post_id: save.id,
-        p_analysis: analysis,
-      }),
+    const analyzed = await analyzeAndPersistSave(save, {
+      optionalContext: parsed.data.inspectionNotes,
+      visualObservations: hasManualFallback ? parsed.data.inspectionNotes : undefined,
+      method: hasManualFallback ? "Manual inspection" : "Caption and optional context",
     });
-    return NextResponse.json({ save: rows[0] });
+    return NextResponse.json({ save: analyzed });
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Analysis failed.";
     return NextResponse.json({ error: message }, { status: 500 });

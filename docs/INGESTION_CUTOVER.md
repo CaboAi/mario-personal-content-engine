@@ -7,6 +7,21 @@ This bridge keeps Instagram authentication on Mario's Windows computer. It reads
 
 Supabase is the dashboard source of truth. Notion is not required for dashboard ingestion. Instagram session cookies must never be added to Vercel, Supabase, source control, screenshots, or chat.
 
+## Automatic saved-post inspection
+
+The local bridge performs the private-media portion of save analysis:
+
+1. Instagram returns a temporary CDN asset URL to the authenticated local bridge.
+2. The bridge downloads that asset into an operating-system temporary directory.
+3. Faster Whisper transcribes video speech locally. The bridge also records mechanical video evidence such as orientation, duration, activity, and sampled visual transitions.
+4. Only the transcript and derived observations are sent to the authenticated dashboard analysis endpoint.
+5. Temporary creator media is deleted as soon as inspection finishes. Raw media URLs, files, Instagram cookies, and full transcripts are never stored in Supabase.
+6. The dashboard quarantines creator-topic terms, saves a topic-neutral delivery blueprint, and ranks three deliberately different Mario-owned directions.
+
+`whisper_model` defaults to `small.en`. Model files live under `runtime/.models/` and are excluded from Git. The first inspection downloads the selected model once; later runs reuse the local copy.
+
+Automatic media inspection is consent-gated. It remains off unless the private local `runtime/config.json` explicitly contains `"enable_automatic_media_analysis": true`. Enable it only after approving the temporary transcript and derived inspection evidence transfer to the existing dashboard/OpenAI analysis service.
+
 ## Before the first live run
 
 1. Confirm the dashboard is deployed and its health check succeeds.

@@ -44,6 +44,21 @@ class ParseMediaTests(unittest.TestCase):
         self.assertEqual(result["url"], "https://www.instagram.com/reel/ABC/")
         self.assertEqual(result["duration_sec"], 37.0)
 
+    def test_keeps_temporary_asset_descriptors_outside_dashboard_payload(self):
+        result = sync.parse_media(
+            {
+                "pk": "123",
+                "media_type": 2,
+                "product_type": "clips",
+                "code": "ABC",
+                "video_versions": [
+                    {"url": "https://scontent.example.fbcdn.net/save.mp4", "width": 720, "height": 1280}
+                ],
+            }
+        )
+        self.assertEqual(result["_analysis_assets"][0]["kind"], "video")
+        self.assertNotIn("_analysis_assets", sync.dashboard_payload(result))
+
     def test_rejects_missing_media_id(self):
         self.assertIsNone(sync.parse_media({"code": "ABC"}))
 
@@ -124,6 +139,7 @@ class StateTests(unittest.TestCase):
             )
             state = sync.load_state("same", path)
             self.assertEqual(state["dashboard_synced_ids"], [])
+            self.assertEqual(state["dashboard_analyzed_ids"], [])
 
 
     def test_save_state_replaces_file_and_cleans_temporary_file(self):
@@ -298,7 +314,8 @@ class DashboardWriteTests(unittest.TestCase):
         response.status_code = status_code
         response.ok = 200 <= status_code < 300
         response.headers = headers or {}
-        response.raise_for_status.side_effect = requests.HTTPError(str(status_code))
+        if not response.ok:
+            response.raise_for_status.side_effect = requests.HTTPError(str(status_code))
         return response
 
     def test_retries_transient_dashboard_failure(self):
@@ -324,6 +341,23 @@ class DashboardWriteTests(unittest.TestCase):
             )
         self.assertEqual(request_post.call_count, 1)
 
+    def test_sends_only_derived_analysis_evidence(self):
+        request_post = Mock(return_value=self.response(200))
+        inspector = Mock(return_value={
+            "transcript": "Spoken words",
+            "visual_observations": "Vertical video with two sampled transitions.",
+        })
+        sync.sync_post_analysis_to_dashboard(
+            self.config,
+            {**self.post, "_analysis_assets": [{"url": "private", "kind": "video"}]},
+            inspector=inspector,
+            request_post=request_post,
+        )
+        request = request_post.call_args
+        self.assertEqual(request.args[0], "https://example.vercel.app/api/ingest/analyze")
+        self.assertEqual(request.kwargs["json"]["transcript"], "Spoken words")
+        self.assertNotIn("_analysis_assets", request.kwargs["json"])
+
 
 class DashboardOnlyMainFlowTests(unittest.TestCase):
     def test_dashboard_sync_does_not_require_notion_and_uses_separate_dedupe(self):
@@ -333,6 +367,7 @@ class DashboardOnlyMainFlowTests(unittest.TestCase):
             "ig_user_id": "user",
             "dashboard_ingest_url": "https://example.vercel.app/api/ingest",
             "dashboard_ingestion_secret": "a" * 32,
+            "enable_automatic_media_analysis": True,
         }
         state = {
             "account_id": "user",
@@ -358,6 +393,7 @@ class DashboardOnlyMainFlowTests(unittest.TestCase):
             patch.object(sync, "fetch_saved_posts", return_value=[post]),
             patch.object(sync, "sync_post") as notion_write,
             patch.object(sync, "sync_post_to_dashboard") as dashboard_write,
+            patch.object(sync, "sync_post_analysis_to_dashboard") as dashboard_analysis,
             patch.object(sync, "save_state") as save_state,
             patch.object(sync.time, "sleep"),
             patch.object(sync, "NotionClient", None),
@@ -368,8 +404,10 @@ class DashboardOnlyMainFlowTests(unittest.TestCase):
         self.assertEqual(result, 0)
         notion_write.assert_not_called()
         dashboard_write.assert_called_once_with(config, post)
+        dashboard_analysis.assert_called_once_with(config, post)
         self.assertEqual(state["synced_ids"], ["123"])
         self.assertEqual(state["dashboard_synced_ids"], ["123"])
+        self.assertEqual(state["dashboard_analyzed_ids"], ["123"])
         self.assertGreaterEqual(save_state.call_count, 2)
 
 

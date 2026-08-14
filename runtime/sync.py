@@ -21,6 +21,11 @@ except ImportError:  # Tests can exercise parsing without the optional client.
 
 
 BASE_DIR = Path(__file__).parent.resolve()
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from media_analysis import extract_media_assets, inspect_saved_media
+
 CONFIG_FILE = BASE_DIR / "config.json"
 STATE_FILE = BASE_DIR / "state.json"
 LOG_FILE = BASE_DIR / "sync.log"
@@ -108,12 +113,17 @@ def enabled_destinations(config: dict[str, str]) -> tuple[bool, bool]:
     return notion_enabled, dashboard_enabled
 
 
+def automatic_media_analysis_enabled(config: dict[str, str]) -> bool:
+    return str(config.get("enable_automatic_media_analysis") or "").strip().lower() == "true"
+
+
 def load_state(account_id: str, path: Path = STATE_FILE) -> dict[str, Any]:
     if not path.exists():
         return {
             "account_id": account_id,
             "synced_ids": [],
             "dashboard_synced_ids": [],
+            "dashboard_analyzed_ids": [],
             "last_sync": None,
         }
     state = json.loads(path.read_text(encoding="utf-8"))
@@ -126,6 +136,7 @@ def load_state(account_id: str, path: Path = STATE_FILE) -> dict[str, Any]:
     state["account_id"] = str(account_id)
     state.setdefault("synced_ids", [])
     state.setdefault("dashboard_synced_ids", [])
+    state.setdefault("dashboard_analyzed_ids", [])
     state.setdefault("last_sync", None)
     return state
 
@@ -213,6 +224,7 @@ def parse_media(media: dict[str, Any]) -> dict[str, Any] | None:
             "saved_collection_ids": [
                 str(value) for value in (media.get("saved_collection_ids") or [])
             ],
+            "_analysis_assets": extract_media_assets(media),
         }
     except (TypeError, ValueError):
         return None
@@ -437,6 +449,42 @@ def sync_post_to_dashboard(
         sleep(delay)
 
 
+def dashboard_analysis_url(config: dict[str, str]) -> str:
+    ingest_url = str(config.get("dashboard_ingest_url") or "").strip().rstrip("/")
+    if not ingest_url.endswith("/api/ingest"):
+        raise ValueError("dashboard_ingest_url must end with /api/ingest.")
+    return f"{ingest_url}/analyze"
+
+
+def sync_post_analysis_to_dashboard(
+    config: dict[str, str],
+    post: dict[str, Any],
+    *,
+    inspector: Any = inspect_saved_media,
+    request_post: Any = requests.post,
+) -> None:
+    secret = str(config.get("dashboard_ingestion_secret") or "").strip()
+    if not secret:
+        return
+    model_name = str(config.get("whisper_model") or "small.en").strip()
+    evidence = inspector(
+        post,
+        model_name=model_name,
+        model_cache=BASE_DIR / ".models",
+    )
+    response = request_post(
+        dashboard_analysis_url(config),
+        headers={"X-Ingestion-Secret": secret, "Content-Type": "application/json"},
+        json={
+            "instagram_media_id": post["media_id"],
+            "transcript": str(evidence.get("transcript") or ""),
+            "visual_observations": str(evidence.get("visual_observations") or ""),
+        },
+        timeout=180,
+    )
+    response.raise_for_status()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Instagram saves to the dashboard and optional Notion mirror"
@@ -458,7 +506,15 @@ def main() -> int:
         action="store_true",
         help="Validate the Notion token and data-source access without writing",
     )
+    parser.add_argument(
+        "--analysis-limit",
+        type=int,
+        help="Inspect at most this many pending saves during the current run",
+    )
     args = parser.parse_args()
+
+    if args.analysis_limit is not None and args.analysis_limit < 1:
+        parser.error("--analysis-limit must be at least 1")
 
     try:
         config = load_config()
@@ -476,6 +532,7 @@ def main() -> int:
                 "account_id": config["ig_user_id"],
                 "synced_ids": [],
                 "dashboard_synced_ids": [],
+                "dashboard_analyzed_ids": [],
                 "last_sync": None,
             }
 
@@ -503,6 +560,7 @@ def main() -> int:
         posts = fetch_saved_posts(session, collection_id)
         synced_ids = set(state["synced_ids"])
         dashboard_synced_ids = set(state["dashboard_synced_ids"])
+        dashboard_analyzed_ids = set(state.setdefault("dashboard_analyzed_ids", []))
         notion_pending = (
             [post for post in posts if post["media_id"] not in synced_ids]
             if notion_enabled
@@ -513,6 +571,13 @@ def main() -> int:
             if dashboard_enabled
             else []
         )
+        analysis_pending = (
+            [post for post in posts if post["media_id"] not in dashboard_analyzed_ids]
+            if dashboard_enabled and automatic_media_analysis_enabled(config)
+            else []
+        )
+        if args.analysis_limit is not None:
+            analysis_pending = analysis_pending[: args.analysis_limit]
 
         if args.dry_run:
             for post in notion_pending:
@@ -524,6 +589,12 @@ def main() -> int:
             for post in dashboard_pending:
                 log.info(
                     "[DRY RUN] Would sync @%s/%s to dashboard",
+                    post["author"],
+                    post["code"],
+                )
+            for post in analysis_pending:
+                log.info(
+                    "[DRY RUN] Would inspect @%s/%s locally and send sanitized evidence",
                     post["author"],
                     post["code"],
                 )
@@ -565,20 +636,36 @@ def main() -> int:
                 log.error("Dashboard write failed for %s: %s", post["media_id"], exc)
             time.sleep(0.2)
 
+        analysis_errors = 0
+        for post in analysis_pending:
+            if post["media_id"] not in dashboard_synced_ids:
+                continue
+            try:
+                sync_post_analysis_to_dashboard(config, post)
+                dashboard_analyzed_ids.add(post["media_id"])
+                state["dashboard_analyzed_ids"] = sorted(dashboard_analyzed_ids)
+                save_state(state)
+            except Exception as exc:
+                analysis_errors += 1
+                log.error("Automatic save inspection failed for %s: %s", post["media_id"], exc)
+            time.sleep(0.2)
+
         state["synced_ids"] = sorted(synced_ids)
         state["dashboard_synced_ids"] = sorted(dashboard_synced_ids)
+        state["dashboard_analyzed_ids"] = sorted(dashboard_analyzed_ids)
         state["last_sync"] = datetime.now(timezone.utc).isoformat()
         save_state(state)
         log.info(
             "Sync complete: %s Notion new | %s dashboard new | "
-            "%s Notion existing | %s dashboard existing | %s errors",
+            "%s Notion existing | %s dashboard existing | %s automatically analyzed | %s errors",
             len(notion_pending) - errors,
             len(dashboard_pending) - dashboard_errors,
             len(posts) - len(notion_pending) if notion_enabled else 0,
             len(posts) - len(dashboard_pending) if dashboard_enabled else 0,
-            errors + dashboard_errors,
+            len(analysis_pending) - analysis_errors,
+            errors + dashboard_errors + analysis_errors,
         )
-        return 1 if errors or dashboard_errors else 0
+        return 1 if errors or dashboard_errors or analysis_errors else 0
     except Exception as exc:
         log.error("Sync failed: %s", exc)
         return 1

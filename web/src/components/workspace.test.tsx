@@ -37,6 +37,41 @@ describe("Production package instructions", () => {
     expect(screen.getByRole("button", { name: "Production" }).getAttribute("aria-current")).toBe("page");
   });
 
+  it("makes technical save-inspection notes optional", () => {
+    render(<Workspace initialData={{
+      ...demoData,
+      saves: [{ ...demoData.saves[0], status: "New", pairings: [], analysisMethod: undefined }],
+    }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
+
+    expect(screen.getByText("The system studies the post. Your notes are optional.")).toBeTruthy();
+    expect(screen.getByText(/what made you save this/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Waiting for automatic inspection" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(/Run the local Instagram sync once/)).toBeTruthy();
+  });
+
+  it("explains why the three Mario directions are different", () => {
+    render(<Workspace initialData={{
+      ...demoData,
+      saves: [{
+        ...demoData.saves[0],
+        analysisMethod: "Automatic media inspection",
+        analysisEvidenceSummary: "Speech and delivery evidence inspected without storing creator media.",
+        pairings: demoData.saves[0].pairings.map((pairing, index) => ({
+          ...pairing,
+          selectionRole: (["Best structural fit", "Different Mario lens", "Credible wildcard"] as const)[index],
+        })),
+      }],
+    }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
+
+    expect(screen.getByText("Automatic media inspection")).toBeTruthy();
+    expect(screen.getByText("Best structural fit")).toBeTruthy();
+    expect(screen.getByText("Different Mario lens")).toBeTruthy();
+    expect(screen.getByText("Credible wildcard")).toBeTruthy();
+    expect(screen.getByText(/Pillars organize these ideas/)).toBeTruthy();
+  });
+
   it("distinguishes recorded lines, visual text, prompts, and internal notes", () => {
     openProduction();
 
@@ -382,7 +417,7 @@ describe("Save source and format decisions", () => {
 
     expect(screen.getByText("Saved post contributes")).toBeTruthy();
     expect(screen.getByText("Selected Mario source contributes")).toBeTruthy();
-    expect(screen.getByText("Choose the story or opinion this post is actually about")).toBeTruthy();
+    expect(screen.getByText("Choose one of three different Mario directions")).toBeTruthy();
     expect(screen.getByRole("radio", { name: /Carousel/ })).toBeTruthy();
     expect(screen.getByRole("radio", { name: /Written Post/ })).toBeTruthy();
     expect(screen.getByRole("radio", { name: /Long-form/ })).toBeTruthy();

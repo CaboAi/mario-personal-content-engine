@@ -10,6 +10,7 @@ import {
 } from "./format-contracts";
 import { fullScriptSchema } from "./full-script-schema";
 import { parseStructuredJson } from "./openai-response";
+import { contentPackageText, findCreatorTopicLeaks } from "./topic-quarantine";
 
 const schema = {
   type: "object",
@@ -82,53 +83,57 @@ export async function generateContentPackage(
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-5-mini",
-      instructions:
-        `You are Mario Polanco's personal content engine. Mario documents reinvention for men rebuilding after failure, loss, and starting over. Use the saved creator only for delivery DNA. Never transfer the creator's topic, wording, claim, story, identity, examples, or lesson. Use only the supplied Mario-owned source. The required output format is ${selectedFormat}; return that exact format and adapt only compatible delivery mechanics from the save. FORMAT CONTRACT: ${getFormatGenerationInstructions(selectedFormat)} Be direct, specific, participant-level rather than guru-like, and native to the selected format. Generate 3-5 spoken hooks and 2-3 on-screen hooks. For non-video formats, spoken hooks are opening-line options and on-screen hooks are cover or first-frame options. The selected spoken and on-screen hooks must exactly match an option in their respective arrays. Use one or two canonical pillars only: Reinvention, Identity, Standards, Action, Responsibility, Self-Respect, Perspective, or Life Story. Choose exactly one test variable and write a falsifiable hypothesis in the form: If [specific change], then [primary metric] should improve because [audience behavior]. Always return cta and caption strings; use an empty string when neither is needed. For Carousel format only, return 2-10 carouselSlides with one screenshot-worthy idea per slide, a repeating visual spine, a payoff, and useful alt text. For every other format, return an empty carouselSlides array. Do not invent facts.`,
-      input: JSON.stringify({
-        savedDeliveryDna: {
-          framework: save.frameworkDna,
-          hookMechanics: save.hookMechanics,
-          visualPacing: save.visualPacing,
-          prohibitedTransfer: save.prohibitedTransfer,
-        },
-        marioSource: {
-          title: pairing.sourceTitle,
-          coreTruth: pairing.coreTruth,
-          storyEvidence: pairing.storyEvidence,
-          rationale: pairing.rationale,
-          direction: pairing.direction,
-          privacyStatus: pairing.privacyStatus,
+  const quarantinedTerms = save.creatorTopicTerms ?? [];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || "gpt-5-mini",
+        instructions:
+          `You are Mario Polanco's personal content engine. Mario documents reinvention for men rebuilding after failure, loss, and starting over. Use the saved creator only for topic-neutral delivery DNA. Never transfer the creator's topic, wording, claim, story, identity, examples, or lesson. The quarantined creator terms are boundary data, not writing material; none may appear in the output: ${quarantinedTerms.join(" | ") || "none supplied"}. Use only the supplied Mario-owned source. The required output format is ${selectedFormat}; return that exact format and adapt only compatible delivery mechanics from the save. FORMAT CONTRACT: ${getFormatGenerationInstructions(selectedFormat)} Be direct, specific, participant-level rather than guru-like, and native to the selected format. Generate 3-5 spoken hooks and 2-3 on-screen hooks. For non-video formats, spoken hooks are opening-line options and on-screen hooks are cover or first-frame options. The selected spoken and on-screen hooks must exactly match an option in their respective arrays. Use one or two canonical pillars only: Reinvention, Identity, Standards, Action, Responsibility, Self-Respect, Perspective, or Life Story. Choose exactly one test variable and write a falsifiable hypothesis in the form: If [specific change], then [primary metric] should improve because [audience behavior]. Always return cta and caption strings; use an empty string when neither is needed. For Carousel format only, return 2-10 carouselSlides with one screenshot-worthy idea per slide, a repeating visual spine, a payoff, and useful alt text. For every other format, return an empty carouselSlides array. Do not invent facts.${attempt ? " A prior draft crossed the creator-topic boundary; rebuild from the Mario source only." : ""}`,
+        input: JSON.stringify({
+          savedDeliveryDna: {
+            framework: save.frameworkDna,
+            hookMechanics: save.hookMechanics,
+            visualPacing: save.visualPacing,
+            prohibitedTransfer: save.prohibitedTransfer,
+          },
+          marioSource: {
+            title: pairing.sourceTitle,
+            coreTruth: pairing.coreTruth,
+            storyEvidence: pairing.storyEvidence,
+            rationale: pairing.rationale,
+            direction: pairing.direction,
+            privacyStatus: pairing.privacyStatus,
+          },
+        }),
+        text: {
+          format: {
+            type: "json_schema",
+            name: "mario_content_package",
+            strict: true,
+            schema,
+          },
         },
       }),
-      text: {
-        format: {
-          type: "json_schema",
-          name: "mario_content_package",
-          strict: true,
-          schema,
-        },
-      },
-    }),
-  });
+    });
 
-  if (!response.ok) {
-    throw new Error(`OpenAI generation failed (${response.status}).`);
+    if (!response.ok) throw new Error(`OpenAI generation failed (${response.status}).`);
+    const generated = contentPackageSchema.parse(parseStructuredJson(await response.json()));
+    if (generated.format !== selectedFormat) {
+      throw new Error(`Generation returned ${generated.format} instead of the selected ${selectedFormat} format.`);
+    }
+    const leaks = findCreatorTopicLeaks(contentPackageText(generated), quarantinedTerms);
+    if (!leaks.length) return generated;
+    if (attempt === 1) {
+      throw new Error(`Generation was stopped because it reused creator-topic material: ${leaks.join(", ")}.`);
+    }
   }
-
-  const result = await response.json();
-  const generated = contentPackageSchema.parse(parseStructuredJson(result));
-  if (generated.format !== selectedFormat) {
-    throw new Error(`Generation returned ${generated.format} instead of the selected ${selectedFormat} format.`);
-  }
-  return generated;
+  throw new Error("Generation could not clear the creator-topic boundary.");
 }
 
 const fullScriptJsonSchema = {
@@ -210,6 +215,10 @@ export async function generateFullScript(
   const generated = fullScriptSchema.parse(parseStructuredJson(await response.json()));
   if (!generated.script.trim().startsWith(content.selectedHook.trim())) {
     throw new Error(`Generated ${draftKind} did not preserve the selected opening.`);
+  }
+  const leaks = findCreatorTopicLeaks(generated.script, save.creatorTopicTerms ?? []);
+  if (leaks.length) {
+    throw new Error(`The ${draftKind} was stopped because it reused creator-topic material: ${leaks.join(", ")}.`);
   }
   return generated;
 }

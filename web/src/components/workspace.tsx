@@ -146,10 +146,6 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
 
   async function analyzeSave() {
     if (!selectedSave) return;
-    if (inspectionNotes.trim().length < 40) {
-      setError("Add specific notes from watching the actual post before analysis.");
-      return;
-    }
     setError(null);
     setIsAnalyzing(true);
     try {
@@ -587,6 +583,11 @@ function SavesInbox({
     return <EmptyState title="No saved posts yet" body="The local Instagram bridge will place new saves here." />;
   }
 
+  const dashboardEvidenceReady =
+    selectedSave.status !== "New" ||
+    selectedSave.contentType === "Post" ||
+    inspectionNotes.trim().length >= 40;
+
   return (
     <section className="review-layout stagger-in">
       <div className="save-list">
@@ -623,30 +624,49 @@ function SavesInbox({
         {selectedSave.status !== "Used" && (
           <div className="analysis-panel">
             <div>
-              <p className="section-label">Step 1 · Delivery reference</p>
-              <h3>Describe what the saved post does</h3>
+              <p className="section-label">Step 1 · Automatic delivery inspection</p>
+              <h3>The system studies the post. Your notes are optional.</h3>
               <p>
-                Watch the post, then note the first frame, spoken hook, sequence, cuts,
-                captions, framing, pacing, and CTA. This captures mechanics—not their topic.
+                The local Instagram sync transcribes speech and sends temporary inspection evidence
+                for structure, hooks, pacing, visuals, and CTA placement. The creator&apos;s topic is
+                quarantined before Mario sources are ranked.
               </p>
+              {selectedSave.analysisMethod && (
+                <div className="analysis-proof" role="status">
+                  <strong>{selectedSave.analysisMethod}</strong>
+                  <span>{selectedSave.analysisEvidenceSummary || "Delivery evidence is available."}</span>
+                </div>
+              )}
             </div>
             <label>
-              <span>Inspection notes</span>
+              <span>Optional context · what made you save this?</span>
               <textarea
                 value={inspectionNotes}
                 onChange={(event) => onInspectionNotesChange(event.target.value)}
-                placeholder="First frame… Hook… Beat sequence… Visual pacing… CTA placement…"
-                rows={7}
+                placeholder="Example: I liked how quickly it got to the point. Leave this blank if the system already captured it."
+                rows={5}
               />
+              <small>This can guide emphasis. It never becomes the subject or override the verified Mario source.</small>
             </label>
-            <button
-              type="button"
-              className="primary-action"
-              onClick={onAnalyze}
-              disabled={isAnalyzing || inspectionNotes.trim().length < 40}
-            >
-              {isAnalyzing ? "Ranking Mario sources…" : selectedSave.pairings.length ? "Rerank source options" : "Analyze delivery and find sources"}
-            </button>
+            <div className="analysis-action">
+              <button
+                type="button"
+                className="primary-action"
+                onClick={onAnalyze}
+                disabled={isAnalyzing || !dashboardEvidenceReady}
+              >
+                {isAnalyzing
+                  ? "Building three Mario directions…"
+                  : selectedSave.pairings.length
+                    ? "Rerank three Mario directions"
+                    : dashboardEvidenceReady
+                      ? "Analyze available evidence"
+                      : "Waiting for automatic inspection"}
+              </button>
+              {!dashboardEvidenceReady && (
+                <small>Run the local Instagram sync once. Detailed manual notes remain available only as a fallback.</small>
+              )}
+            </div>
           </div>
         )}
 
@@ -668,10 +688,18 @@ function SavesInbox({
         {selectedSave.status !== "New" && <div className="pairing-heading">
           <div>
             <p className="section-label">Step 2 · Mario-owned source</p>
-            <h3>Choose the story or opinion this post is actually about</h3>
+            <h3>Choose one of three different Mario directions</h3>
           </div>
           <span>Choose one verified source</span>
         </div>}
+
+        {selectedSave.status !== "New" && (
+          <p className="pairing-explainer">
+            The first is the strongest structural match. The second intentionally changes the Mario
+            lens. The third is a less obvious but still credible direction. Pillars organize these
+            ideas; the verified source determines the actual subject.
+          </p>
+        )}
 
         {selectedSave.status !== "New" && (
           <div className="source-model" aria-label="How saved references and Mario sources work">
@@ -692,7 +720,9 @@ function SavesInbox({
               <div>
                 <div className="pairing-title-row">
                   <strong>{pairing.title}</strong>
-                  {pairing.recommended && <span className="recommended">Recommended</span>}
+                  <span className="recommended">
+                    {pairing.selectionRole || (pairing.recommended ? "Best structural fit" : `Direction ${index + 1}`)}
+                  </span>
                 </div>
                 {pairing.coreTruth && <p className="source-truth"><b>Core truth:</b> {pairing.coreTruth}</p>}
                 {pairing.storyEvidence && <p><b>Known evidence:</b> {pairing.storyEvidence}</p>}

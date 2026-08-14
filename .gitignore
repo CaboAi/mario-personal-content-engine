@@ -12,6 +12,7 @@ web/supabase-projects.local.json
 __pycache__/
 *.py[cod]
 .pytest_cache/
+runtime/.models/
 
 # Generated media
 exports/

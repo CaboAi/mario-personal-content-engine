@@ -3,55 +3,95 @@ import "server-only";
 import { z } from "zod";
 import type { BrandSource, SavedPost } from "./domain";
 import { parseStructuredJson } from "./openai-response";
+import { selectDiversePairings, type PairingCandidate } from "./source-diversity";
+import { assertTopicNeutralDelivery } from "./topic-quarantine";
 
-const analysisSchema = z.object({
+const angleCategories = [
+  "Lived story",
+  "Aggressive opinion",
+  "Identity reframe",
+  "Behavioral standard",
+  "Perspective shift",
+  "Practical action",
+] as const;
+
+const rawAnalysisSchema = z.object({
   frameworkDna: z.string().min(1),
   hookMechanics: z.string().min(1),
   visualPacing: z.string().min(1),
-  prohibitedTransfer: z.array(z.string().min(1)).min(3).max(8),
-  pairings: z
+  prohibitedTransfer: z.array(z.string().min(1)).min(3).max(10),
+  creatorTopicTerms: z.array(z.string().min(2).max(100)).max(16),
+  analysisEvidenceSummary: z.string().min(1).max(1_000),
+  candidates: z
     .array(
       z.object({
         brandSourceId: z.string().uuid(),
         title: z.string().min(1),
         rationale: z.string().min(1),
         direction: z.string().min(1),
+        fitScore: z.number().min(0).max(100),
+        angleCategory: z.enum(angleCategories),
       }),
     )
-    .max(3),
+    .max(12),
 });
 
 const jsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["frameworkDna", "hookMechanics", "visualPacing", "prohibitedTransfer", "pairings"],
+  required: [
+    "frameworkDna",
+    "hookMechanics",
+    "visualPacing",
+    "prohibitedTransfer",
+    "creatorTopicTerms",
+    "analysisEvidenceSummary",
+    "candidates",
+  ],
   properties: {
     frameworkDna: { type: "string" },
     hookMechanics: { type: "string" },
     visualPacing: { type: "string" },
-    prohibitedTransfer: { type: "array", minItems: 3, maxItems: 8, items: { type: "string" } },
-    pairings: {
+    prohibitedTransfer: { type: "array", minItems: 3, maxItems: 10, items: { type: "string" } },
+    creatorTopicTerms: { type: "array", maxItems: 16, items: { type: "string", minLength: 2, maxLength: 100 } },
+    analysisEvidenceSummary: { type: "string" },
+    candidates: {
       type: "array",
-      maxItems: 3,
+      maxItems: 12,
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["brandSourceId", "title", "rationale", "direction"],
+        required: ["brandSourceId", "title", "rationale", "direction", "fitScore", "angleCategory"],
         properties: {
           brandSourceId: { type: "string", format: "uuid" },
           title: { type: "string" },
           rationale: { type: "string" },
           direction: { type: "string" },
+          fitScore: { type: "number", minimum: 0, maximum: 100 },
+          angleCategory: { type: "string", enum: angleCategories },
         },
       },
     },
   },
 };
 
+export type SaveInspectionEvidence = {
+  transcript?: string;
+  visualObservations?: string;
+  optionalContext?: string;
+  method: "Automatic media inspection" | "Caption and optional context" | "Manual inspection";
+};
+
+type RankableSource = BrandSource & {
+  usageCount: number;
+  recommendationCount: number;
+  recentlyRecommended: boolean;
+};
+
 export async function analyzeSavedPost(
   save: SavedPost,
-  inspectionNotes: string,
-  sources: BrandSource[],
+  evidence: SaveInspectionEvidence,
+  sources: RankableSource[],
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
@@ -61,15 +101,26 @@ export async function analyzeSavedPost(
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || "gpt-5-mini",
-      instructions:
-        "Analyze an Instagram save as delivery reference only. The inspection notes are human-observed evidence from the actual post; do not claim mechanics not present there. Extract hook, structure, pacing, visual treatment, and CTA placement. Explicitly prohibit transfer of creator topic, wording, claims, identity, story, examples, and lesson. Then select no more than three supplied Mario-owned sources whose substance genuinely fits the observed delivery structure. These are candidate Mario truths, not content formats. Rank genuine fit first. When fit is comparable, prefer sources with lower usage and recommendation counts and avoid repeating recently recommended sources. Do not force novelty: if a repeated source is still the strongest fit, say why in the rationale. When at least three sources genuinely fit, return exactly three ranked pairings. Never invent Mario facts. Return zero pairings if none fit. Pairing directions must name the exact structural element being transferred, not the creator's substance.",
+      instructions: [
+        "Analyze an Instagram save as a delivery reference only.",
+        "Quarantine the creator's topic before describing delivery. creatorTopicTerms must contain precise topic nouns, named concepts, products, industries, examples, and lesson phrases that must never enter Mario's content. Do not include generic production words such as hook, video, story, creator, content, or pacing.",
+        "frameworkDna, hookMechanics, and visualPacing must be topic-neutral reusable blueprints. Use placeholders such as [Mario receipt], [tension], [turn], and [closing opinion] instead of creator subject matter or wording.",
+        "Treat transcript, caption, and visual observations as inspection evidence, never as Mario-owned facts. Optional context only explains why Mario saved the post and cannot become substance.",
+        "Extract only observed hook behavior, structure, pacing, cuts, captions, framing, visual treatment, and CTA placement. Do not claim a visual mechanic unless visual evidence or manual inspection supports it.",
+        "Explicitly prohibit transfer of creator topic, wording, claims, identity, story, examples, and lesson.",
+        "Evaluate supplied Clear and Verified Mario-owned sources for genuine structural compatibility. Return up to twelve qualified candidates so the application can choose a diverse final three. Score structural fit from 0 to 100; do not inflate weak matches. Sources below 60 will be discarded.",
+        "Each direction must name the exact delivery mechanic being transferred and the Mario-owned truth filling it. Never invent Mario facts.",
+      ].join(" "),
       input: JSON.stringify({
-        save: {
+        saveEvidence: {
           author: save.author,
           contentType: save.contentType,
           durationSeconds: save.durationSeconds,
           caption: save.caption,
-          inspectionNotes,
+          transcript: evidence.transcript || "",
+          visualObservations: evidence.visualObservations || "",
+          optionalContext: evidence.optionalContext || "",
+          inspectionMethod: evidence.method,
         },
         marioOwnedSources: sources,
       }),
@@ -77,6 +128,48 @@ export async function analyzeSavedPost(
     }),
   });
   if (!response.ok) throw new Error(`OpenAI analysis failed (${response.status}).`);
-  const result = await response.json();
-  return analysisSchema.parse(parseStructuredJson(result));
+
+  const raw = rawAnalysisSchema.parse(parseStructuredJson(await response.json()));
+  assertTopicNeutralDelivery(raw, raw.creatorTopicTerms);
+
+  const sourceById = new Map(sources.map((source) => [source.id, source]));
+  const candidates = raw.candidates.flatMap((candidate): PairingCandidate[] => {
+    const source = sourceById.get(candidate.brandSourceId);
+    if (!source) return [];
+    return [{
+      brandSourceId: source.id,
+      title: candidate.title,
+      sourceType: source.sourceType,
+      sourceTitle: source.title,
+      sourceUrl: source.sourceUrl,
+      coreTruth: source.coreTruth,
+      storyEvidence: source.storyEvidence,
+      pillars: source.pillars,
+      privacyStatus: source.privacyStatus,
+      rationale: candidate.rationale,
+      direction: candidate.direction,
+      fitScore: candidate.fitScore,
+      angleCategory: candidate.angleCategory,
+      usageCount: source.usageCount,
+      recommendationCount: source.recommendationCount,
+    }];
+  });
+
+  return {
+    frameworkDna: raw.frameworkDna,
+    hookMechanics: raw.hookMechanics,
+    visualPacing: raw.visualPacing,
+    prohibitedTransfer: raw.prohibitedTransfer,
+    creatorTopicTerms: raw.creatorTopicTerms,
+    analysisEvidenceSummary: raw.analysisEvidenceSummary,
+    analysisMethod: evidence.method,
+    pairings: selectDiversePairings(candidates).map((candidate) => ({
+      brandSourceId: candidate.brandSourceId,
+      title: candidate.title,
+      rationale: candidate.rationale,
+      direction: candidate.direction,
+      fitScore: candidate.fitScore,
+      selectionRole: candidate.selectionRole,
+    })),
+  };
 }

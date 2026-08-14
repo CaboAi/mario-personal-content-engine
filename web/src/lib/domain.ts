@@ -46,6 +46,8 @@ export type Pairing = {
   pillars?: string[];
   privacyStatus: "Clear" | "Needs confirmation";
   recommended?: boolean;
+  selectionRole?: "Best structural fit" | "Different Mario lens" | "Credible wildcard";
+  fitScore?: number;
 };
 
 export type SavedPost = {
@@ -62,6 +64,9 @@ export type SavedPost = {
   hookMechanics: string;
   visualPacing: string;
   prohibitedTransfer: string[];
+  creatorTopicTerms?: string[];
+  analysisMethod?: "Automatic media inspection" | "Caption and optional context" | "Manual inspection";
+  analysisEvidenceSummary?: string;
   inspectionNotes?: string;
   pairings: Pairing[];
 };

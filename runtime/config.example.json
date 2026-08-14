@@ -6,5 +6,7 @@
   "notion_token": "",
   "notion_saves_data_source_id": "",
   "dashboard_ingest_url": "https://YOUR-APP.vercel.app/api/ingest",
-  "dashboard_ingestion_secret": "REPLACE_WITH_THE_SAME_32_PLUS_CHARACTER_RANDOM_SECRET_USED_IN_VERCEL"
+  "dashboard_ingestion_secret": "REPLACE_WITH_THE_SAME_32_PLUS_CHARACTER_RANDOM_SECRET_USED_IN_VERCEL",
+  "whisper_model": "small.en",
+  "enable_automatic_media_analysis": false
 }

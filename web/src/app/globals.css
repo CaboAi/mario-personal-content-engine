@@ -327,8 +327,13 @@ a { color: inherit; }
 .analysis-panel p:not(.section-label) { margin: .55rem 0 0; color: var(--muted); font-size: .72rem; line-height: 1.5; }
 .analysis-panel label { display: grid; gap: .4rem; }
 .analysis-panel label span { color: var(--muted); font-size: .62rem; }
+.analysis-panel label small, .analysis-action small { color: var(--muted); font-size: .61rem; line-height: 1.45; }
 .analysis-panel textarea { width: 100%; resize: vertical; padding: .75rem; border: 1px solid var(--line); border-radius: .6rem; background: var(--white); color: var(--ink); font: .72rem/1.5 var(--font-geist-sans), sans-serif; outline: none; }
 .analysis-panel textarea:focus { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.analysis-proof { display: grid; gap: .18rem; margin-top: .8rem; padding-left: .7rem; border-left: 2px solid var(--success); }
+.analysis-proof strong { color: var(--ink); font-size: .67rem; }
+.analysis-proof span { color: var(--muted); font-size: .63rem; line-height: 1.45; }
+.analysis-action { display: grid; gap: .45rem; align-self: end; }
 .detail-heading { align-items: center; border-bottom: 1px solid var(--ink); }
 .detail-heading h2 { margin: 0; font-size: 2rem; font-weight: 570; letter-spacing: -0.05em; }
 
@@ -343,6 +348,7 @@ a { color: inherit; }
 .boundary-block li::before, .brand-rules li::before { position: absolute; left: 0; content: "—"; color: var(--accent); }
 
 .pairing-heading { padding-top: 2.2rem; }
+.pairing-explainer { max-width: 82ch; margin: -.2rem 0 1rem; color: var(--muted); font-size: .72rem; line-height: 1.55; }
 .source-model { display: grid; grid-template-columns: 1fr 1fr; margin: -.2rem 0 1rem; border: 1px solid var(--line); border-radius: .75rem; background: rgba(252,251,248,.5); }
 .source-model > div { display: grid; gap: .25rem; padding: .9rem 1rem; }
 .source-model > div + div { border-left: 1px solid var(--line); }
