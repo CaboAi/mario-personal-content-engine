@@ -23,6 +23,20 @@ function openProduction(cta?: string) {
 }
 
 describe("Production package instructions", () => {
+  it("keeps every primary destination accessible through the compact navigation", () => {
+    render(<Workspace initialData={demoData} />);
+
+    expect(screen.getByRole("button", { name: "Command Center" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("Home")).toBeTruthy();
+    expect(screen.getByText("Saves")).toBeTruthy();
+    expect(screen.getByText("Make")).toBeTruthy();
+    expect(screen.getByText("Results")).toBeTruthy();
+    expect(screen.getByText("Brand")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Production" }));
+    expect(screen.getByRole("button", { name: "Production" }).getAttribute("aria-current")).toBe("page");
+  });
+
   it("distinguishes recorded lines, visual text, prompts, and internal notes", () => {
     openProduction();
 
@@ -384,5 +398,17 @@ describe("Performance evidence architecture", () => {
     expect(screen.getByText("Your published baseline")).toBeTruthy();
     expect(screen.getByText("Comparable review windows")).toBeTruthy();
     expect(screen.getByText("Signals worth repeating—not premature rules")).toBeTruthy();
+  });
+
+  it("labels experiment values for the stacked mobile metric layout", () => {
+    const { container } = render(<Workspace initialData={{
+      ...demoData,
+      content: [{ ...generatedDemoPackage, instagramMediaId: "media-mobile" }],
+    }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Performance" }));
+
+    expect(container.querySelector('[data-label="24 hours"]')).toBeTruthy();
+    expect(container.querySelector('[data-label="7 days"]')).toBeTruthy();
+    expect(container.querySelector('[data-label="Signal"]')).toBeTruthy();
   });
 });

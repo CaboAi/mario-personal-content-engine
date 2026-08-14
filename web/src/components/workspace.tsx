@@ -1,6 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import {
+  BookmarkSimple,
+  ChartLineUp,
+  House,
+  Palette,
+  VideoCamera,
+} from "@phosphor-icons/react";
 import type {
   BrandSourceInventory,
   ContentFormat,
@@ -20,13 +27,19 @@ import { getExperimentMetricRows } from "@/lib/performance";
 
 type View = "command" | "saves" | "production" | "performance" | "brand";
 
-const views: Array<{ id: View; label: string; index: string }> = [
-  { id: "command", label: "Command Center", index: "01" },
-  { id: "saves", label: "Saves Inbox", index: "02" },
-  { id: "production", label: "Production", index: "03" },
-  { id: "performance", label: "Performance", index: "04" },
-  { id: "brand", label: "Brand System", index: "05" },
-];
+const views = [
+  { id: "command", label: "Command Center", shortLabel: "Home", index: "01", icon: House },
+  { id: "saves", label: "Saves Inbox", shortLabel: "Saves", index: "02", icon: BookmarkSimple },
+  { id: "production", label: "Production", shortLabel: "Make", index: "03", icon: VideoCamera },
+  { id: "performance", label: "Performance", shortLabel: "Results", index: "04", icon: ChartLineUp },
+  { id: "brand", label: "Brand System", shortLabel: "Brand", index: "05", icon: Palette },
+] satisfies Array<{
+  id: View;
+  label: string;
+  shortLabel: string;
+  index: string;
+  icon: typeof House;
+}>;
 
 const contentFormats: Array<{ id: ContentFormat; label: string; purpose: string }> = [
   { id: "Yap Reel", label: "Yap Reel", purpose: "One direct argument to camera; optional full script later" },
@@ -329,17 +342,24 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
         </div>
 
         <nav className="rail-nav" aria-label="Primary navigation">
-          {views.map((item) => (
-            <button
-              key={item.id}
-              className={view === item.id ? "rail-link active" : "rail-link"}
-              onClick={() => setView(item.id)}
-              type="button"
-            >
-              <span>{item.index}</span>
-              {item.label}
-            </button>
-          ))}
+          {views.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                aria-current={view === item.id ? "page" : undefined}
+                aria-label={item.label}
+                className={view === item.id ? "rail-link active" : "rail-link"}
+                onClick={() => setView(item.id)}
+                type="button"
+              >
+                <span className="rail-index">{item.index}</span>
+                <Icon aria-hidden="true" className="rail-icon" size={20} weight="regular" />
+                <span className="rail-label">{item.label}</span>
+                <span className="rail-label-mobile">{item.shortLabel}</span>
+              </button>
+            );
+          })}
         </nav>
 
         <div className="rail-foot">
@@ -1193,7 +1213,12 @@ function PerformanceCard({
       <div className="metric-table">
         <div className="metric-table-head"><span>Metric</span><span>24 hours</span><span>7 days</span><span>Signal</span></div>
         {rows.map(({ label, key }) => (
-          <div className="metric-table-row" key={label}><strong>{label}</strong><span>{metricValue(at24, key)}</span><span>{metricValue(at168, key)}</span><span>{signal}</span></div>
+          <div className="metric-table-row" key={label}>
+            <strong>{label}</strong>
+            <span data-label="24 hours">{metricValue(at24, key)}</span>
+            <span data-label="7 days">{metricValue(at168, key)}</span>
+            <span className="metric-signal" data-label="Signal">{signal}</span>
+          </div>
         ))}
       </div>
       {itemReviews.map((review) => (
