@@ -5,16 +5,24 @@ import { analyzeAndPersistSave } from "@/lib/save-analysis-service";
 import { secureCompare } from "@/lib/session";
 import { isLiveMode, supabaseRequest } from "@/lib/supabase-rest";
 
-const MAX_BODY_BYTES = 96 * 1024;
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
+const visualFrameSchema = z.object({
+  label: z.string().trim().min(1).max(100),
+  data_url: z
+    .string()
+    .max(625_000)
+    .regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/),
+}).strict();
 const requestSchema = z.object({
   instagram_media_id: z.string().trim().min(1).max(128),
   transcript: z.string().trim().max(40_000).optional().default(""),
   visual_observations: z.string().trim().max(20_000).optional().default(""),
+  visual_frames: z.array(visualFrameSchema).max(6).optional().default([]),
   optional_context: z.string().trim().max(2_000).optional().default(""),
   force: z.boolean().optional().default(false),
 }).strict().refine(
-  (value) => Boolean(value.transcript || value.visual_observations),
-  "Transcript or visual observations are required.",
+  (value) => Boolean(value.transcript || value.visual_observations || value.visual_frames.length),
+  "Transcript, visual observations, or visual frames are required.",
 );
 
 export async function POST(request: Request) {
@@ -68,6 +76,10 @@ export async function POST(request: Request) {
     const analyzed = await analyzeAndPersistSave(save, {
       transcript: parsed.data.transcript,
       visualObservations: parsed.data.visual_observations,
+      visualFrames: parsed.data.visual_frames.map((frame) => ({
+        label: frame.label,
+        dataUrl: frame.data_url,
+      })),
       optionalContext: parsed.data.optional_context,
       method: "Automatic media inspection",
     });

@@ -11,7 +11,9 @@ const publicPaths = new Set([
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (publicPaths.has(pathname)) return NextResponse.next();
+  if (publicPaths.has(pathname) || pathname.startsWith("/api/ingest/")) {
+    return NextResponse.next();
+  }
 
   const authConfigured = Boolean(
     process.env.DASHBOARD_PASSWORD && process.env.DASHBOARD_SESSION_SECRET,

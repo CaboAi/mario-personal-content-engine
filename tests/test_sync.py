@@ -341,13 +341,19 @@ class DashboardWriteTests(unittest.TestCase):
             )
         self.assertEqual(request_post.call_count, 1)
 
-    def test_sends_only_derived_analysis_evidence(self):
-        request_post = Mock(return_value=self.response(200))
+    def test_sends_only_approved_analysis_evidence(self):
+        response = self.response(200)
+        response.json.return_value = {"skipped": False}
+        request_post = Mock(return_value=response)
         inspector = Mock(return_value={
             "transcript": "Spoken words",
             "visual_observations": "Vertical video with two sampled transitions.",
+            "visual_frames": [{
+                "label": "Opening frame at 0.0s",
+                "data_url": "data:image/jpeg;base64,ZmFrZQ==",
+            }],
         })
-        sync.sync_post_analysis_to_dashboard(
+        analyzed = sync.sync_post_analysis_to_dashboard(
             self.config,
             {**self.post, "_analysis_assets": [{"url": "private", "kind": "video"}]},
             inspector=inspector,
@@ -356,7 +362,20 @@ class DashboardWriteTests(unittest.TestCase):
         request = request_post.call_args
         self.assertEqual(request.args[0], "https://example.vercel.app/api/ingest/analyze")
         self.assertEqual(request.kwargs["json"]["transcript"], "Spoken words")
+        self.assertEqual(request.kwargs["json"]["visual_frames"][0]["label"], "Opening frame at 0.0s")
         self.assertNotIn("_analysis_assets", request.kwargs["json"])
+        self.assertTrue(analyzed)
+
+    def test_reports_used_save_as_already_complete(self):
+        response = self.response(200)
+        response.json.return_value = {"skipped": True, "reason": "Production item already exists."}
+        analyzed = sync.sync_post_analysis_to_dashboard(
+            self.config,
+            {**self.post, "_analysis_assets": [{"url": "private", "kind": "video"}]},
+            inspector=Mock(return_value={"transcript": "Spoken words"}),
+            request_post=Mock(return_value=response),
+        )
+        self.assertFalse(analyzed)
 
 
 class DashboardOnlyMainFlowTests(unittest.TestCase):

@@ -33,7 +33,7 @@ The private dashboard is live at `https://mario-personal-content-engine.vercel.a
 
 The local bridge writes normalized saves to the dashboard without sending Instagram cookies to the cloud; Notion is an optional independent mirror. The canonical `MarioPersonalInstagramSavesSync` Windows task runs at 9 AM and 9 PM and supports the configured collection, including a local-filter fallback when Instagram's direct collection feed returns 404.
 
-Saved-post analysis is dashboard-native and notes-optional. The local bridge temporarily inspects creator media, transcribes speech with Faster Whisper on Mario's computer, sends only derived evidence to the authenticated dashboard, and deletes the downloaded media. The saved creator supplies delivery mechanics only; verified Mario-owned sources supply every topic, story, claim, opinion, and lesson.
+Saved-post analysis is dashboard-native and notes-optional. With explicit local consent enabled, the bridge temporarily inspects creator media, transcribes speech with Faster Whisper on Mario's computer, and sends the transcript plus a few compact representative frames to the authenticated dashboard for a `store: false` OpenAI analysis. Temporary media and frames are deleted, and none of that raw evidence is stored in Supabase. The saved creator supplies delivery mechanics only; verified Mario-owned sources supply every topic, story, claim, opinion, and lesson.
 
 The live deployment checklist is in [`docs/VERCEL_DEPLOYMENT.md`](docs/VERCEL_DEPLOYMENT.md). Vercel must use `web` as the Root Directory; production secrets are configured in Vercel and remain out of the repository.
 

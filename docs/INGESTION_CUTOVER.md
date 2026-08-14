@@ -13,14 +13,14 @@ The local bridge performs the private-media portion of save analysis:
 
 1. Instagram returns a temporary CDN asset URL to the authenticated local bridge.
 2. The bridge downloads that asset into an operating-system temporary directory.
-3. Faster Whisper transcribes video speech locally. The bridge also records mechanical video evidence such as orientation, duration, activity, and sampled visual transitions.
-4. Only the transcript and derived observations are sent to the authenticated dashboard analysis endpoint.
-5. Temporary creator media is deleted as soon as inspection finishes. Raw media URLs, files, Instagram cookies, and full transcripts are never stored in Supabase.
-6. The dashboard quarantines creator-topic terms, saves a topic-neutral delivery blueprint, and ranks three deliberately different Mario-owned directions.
+3. Faster Whisper transcribes video speech locally. The bridge also records mechanical video evidence and extracts no more than six compact representative frames.
+4. Only the transcript, derived observations, and representative frames are sent to the authenticated dashboard analysis endpoint. The OpenAI Responses request explicitly uses `store: false`.
+5. Temporary creator media and extracted frames are deleted as soon as inspection finishes. Raw media URLs, files, Instagram cookies, frames, and full transcripts are never stored in Supabase.
+6. The dashboard quarantines creator-topic terms, saves only a topic-neutral delivery blueprint, and ranks three deliberately different Mario-owned directions.
 
 `whisper_model` defaults to `small.en`. Model files live under `runtime/.models/` and are excluded from Git. The first inspection downloads the selected model once; later runs reuse the local copy.
 
-Automatic media inspection is consent-gated. It remains off unless the private local `runtime/config.json` explicitly contains `"enable_automatic_media_analysis": true`. Enable it only after approving the temporary transcript and derived inspection evidence transfer to the existing dashboard/OpenAI analysis service.
+Automatic media inspection is consent-gated. It remains off unless the private local `runtime/config.json` explicitly contains `"enable_automatic_media_analysis": true`. Enable it only after approving the temporary transcript, representative frames, and derived inspection evidence transfer to the existing dashboard/OpenAI analysis service. `store: false` prevents Responses application-state storage, but standard API abuse-monitoring retention may still apply under the account's OpenAI data controls.
 
 ## Before the first live run
 

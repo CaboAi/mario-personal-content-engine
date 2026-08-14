@@ -462,7 +462,7 @@ def sync_post_analysis_to_dashboard(
     *,
     inspector: Any = inspect_saved_media,
     request_post: Any = requests.post,
-) -> None:
+) -> bool:
     secret = str(config.get("dashboard_ingestion_secret") or "").strip()
     if not secret:
         return
@@ -479,10 +479,16 @@ def sync_post_analysis_to_dashboard(
             "instagram_media_id": post["media_id"],
             "transcript": str(evidence.get("transcript") or ""),
             "visual_observations": str(evidence.get("visual_observations") or ""),
+            "visual_frames": list(evidence.get("visual_frames") or []),
         },
         timeout=180,
     )
     response.raise_for_status()
+    try:
+        result = response.json()
+    except (requests.JSONDecodeError, ValueError):
+        result = {}
+    return not (isinstance(result, dict) and result.get("skipped") is True)
 
 
 def main() -> int:
@@ -637,11 +643,17 @@ def main() -> int:
             time.sleep(0.2)
 
         analysis_errors = 0
+        analysis_successes = 0
+        analysis_skips = 0
         for post in analysis_pending:
             if post["media_id"] not in dashboard_synced_ids:
                 continue
             try:
-                sync_post_analysis_to_dashboard(config, post)
+                analyzed = sync_post_analysis_to_dashboard(config, post)
+                if analyzed:
+                    analysis_successes += 1
+                else:
+                    analysis_skips += 1
                 dashboard_analyzed_ids.add(post["media_id"])
                 state["dashboard_analyzed_ids"] = sorted(dashboard_analyzed_ids)
                 save_state(state)
@@ -657,12 +669,14 @@ def main() -> int:
         save_state(state)
         log.info(
             "Sync complete: %s Notion new | %s dashboard new | "
-            "%s Notion existing | %s dashboard existing | %s automatically analyzed | %s errors",
+            "%s Notion existing | %s dashboard existing | %s automatically analyzed | "
+            "%s already complete | %s errors",
             len(notion_pending) - errors,
             len(dashboard_pending) - dashboard_errors,
             len(posts) - len(notion_pending) if notion_enabled else 0,
             len(posts) - len(dashboard_pending) if dashboard_enabled else 0,
-            len(analysis_pending) - analysis_errors,
+            analysis_successes,
+            analysis_skips,
             errors + dashboard_errors + analysis_errors,
         )
         return 1 if errors or dashboard_errors or analysis_errors else 0

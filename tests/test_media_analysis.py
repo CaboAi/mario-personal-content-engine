@@ -58,13 +58,47 @@ class MediaAssetTests(unittest.TestCase):
             patch.object(media_analysis, "download_asset", side_effect=fake_download),
             patch.object(media_analysis, "transcribe_video", return_value=("transcript", "speech summary")),
             patch.object(media_analysis, "inspect_video_mechanics", return_value="visual summary"),
+            patch.object(media_analysis, "extract_video_visual_frames", return_value=[{
+                "label": "Opening frame at 0.0s",
+                "data_url": "data:image/jpeg;base64,ZmFrZQ==",
+            }]),
         ):
             with tempfile.TemporaryDirectory() as cache:
                 result = media_analysis.inspect_saved_media(post, model_cache=Path(cache))
 
         self.assertEqual(result["transcript"], "transcript")
+        self.assertEqual(len(result["visual_frames"]), 1)
         self.assertTrue(seen_paths)
         self.assertFalse(seen_paths[0].exists())
+
+    def test_static_assets_become_ordered_visual_evidence_and_are_deleted(self):
+        seen_paths = []
+
+        def fake_download(_url, destination, **_kwargs):
+            destination.write_bytes(b"temporary")
+            seen_paths.append(destination)
+
+        def fake_frame(_path, label):
+            return {"label": label, "data_url": "data:image/jpeg;base64,ZmFrZQ=="}
+
+        post = {
+            "content_type": "Carousel",
+            "_analysis_assets": [
+                {"kind": "image", "url": f"https://slide{i}.cdninstagram.com/a.jpg", "width": 1080, "height": 1350}
+                for i in range(8)
+            ],
+        }
+        with (
+            patch.object(media_analysis, "download_asset", side_effect=fake_download),
+            patch.object(media_analysis, "extract_static_visual_frame", side_effect=fake_frame),
+        ):
+            with tempfile.TemporaryDirectory() as cache:
+                result = media_analysis.inspect_saved_media(post, model_cache=Path(cache))
+
+        self.assertEqual(len(result["visual_frames"]), media_analysis.MAX_VISUAL_FRAMES)
+        self.assertEqual(result["visual_frames"][0]["label"], "Carousel slide 1")
+        self.assertEqual(result["visual_frames"][-1]["label"], "Carousel slide 6")
+        self.assertTrue(all(not path.exists() for path in seen_paths))
 
 
 if __name__ == "__main__":

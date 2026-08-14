@@ -7,6 +7,8 @@ function returns. Raw media URLs and files never enter the dashboard payload.
 
 from __future__ import annotations
 
+import base64
+import io
 import math
 import tempfile
 from pathlib import Path
@@ -17,6 +19,8 @@ import requests
 
 
 MAX_MEDIA_BYTES = 100 * 1024 * 1024
+MAX_VISUAL_FRAMES = 6
+MAX_FRAME_BYTES = 450 * 1024
 ALLOWED_MEDIA_HOST_SUFFIXES = (".cdninstagram.com", ".fbcdn.net")
 _MODELS: dict[tuple[str, str], Any] = {}
 
@@ -191,30 +195,139 @@ def inspect_video_mechanics(path: Path) -> str:
     )
 
 
+def _frame_dimensions(width: int, height: int, max_dimension: int) -> tuple[int, int]:
+    scale = min(1.0, max_dimension / max(width, height, 1))
+    resized_width = max(2, int(width * scale))
+    resized_height = max(2, int(height * scale))
+    # The JPEG encoder uses 4:2:0 chroma and therefore needs even dimensions.
+    return resized_width - resized_width % 2, resized_height - resized_height % 2
+
+
+def _encode_frame_as_jpeg(frame: Any, *, max_dimension: int = 640) -> bytes:
+    import av
+
+    width, height = _frame_dimensions(int(frame.width), int(frame.height), max_dimension)
+    resized = frame.reformat(width=width, height=height, format="yuvj420p")
+    buffer = io.BytesIO()
+    with av.open(buffer, mode="w", format="image2pipe") as output:
+        stream = output.add_stream("mjpeg")
+        stream.width = width
+        stream.height = height
+        stream.pix_fmt = "yuvj420p"
+        stream.options = {"qscale": "5"}
+        for packet in stream.encode(resized):
+            output.mux(packet)
+        for packet in stream.encode():
+            output.mux(packet)
+    encoded = buffer.getvalue()
+    if len(encoded) > MAX_FRAME_BYTES and max_dimension > 384:
+        return _encode_frame_as_jpeg(frame, max_dimension=384)
+    if len(encoded) > MAX_FRAME_BYTES:
+        raise ValueError("A visual evidence frame exceeds the inspection limit.")
+    return encoded
+
+
+def _visual_frame(frame: Any, label: str) -> dict[str, str]:
+    encoded = base64.b64encode(_encode_frame_as_jpeg(frame)).decode("ascii")
+    return {"label": label, "data_url": f"data:image/jpeg;base64,{encoded}"}
+
+
+def extract_video_visual_frames(path: Path) -> list[dict[str, str]]:
+    """Extract a few representative frames without persisting them beyond temp storage."""
+    try:
+        import av
+    except ImportError as exc:
+        raise RuntimeError("The faster-whisper media decoder is unavailable.") from exc
+
+    frames: list[dict[str, str]] = []
+    with av.open(str(path)) as container:
+        stream = next((candidate for candidate in container.streams if candidate.type == "video"), None)
+        if stream is None:
+            return frames
+        if stream.duration is not None and stream.time_base is not None:
+            duration = float(stream.duration * stream.time_base)
+        elif container.duration is not None:
+            duration = float(container.duration / 1_000_000)
+        else:
+            duration = 0.0
+
+        if duration > 1:
+            targets = [
+                (0.0, "Opening frame"),
+                (max(0.5, duration * 0.12), "Early frame"),
+                (duration * 0.5, "Middle frame"),
+                (max(0.0, duration - 0.5), "Closing frame"),
+            ]
+        else:
+            targets = [(0.0, "Opening frame")]
+
+        target_index = 0
+        for frame in container.decode(stream):
+            timestamp = float(frame.time or 0.0)
+            while target_index < len(targets) and timestamp + 0.05 >= targets[target_index][0]:
+                target_time, label = targets[target_index]
+                frames.append(_visual_frame(frame, f"{label} at {target_time:.1f}s"))
+                target_index += 1
+            if target_index >= len(targets):
+                break
+    return frames[:MAX_VISUAL_FRAMES]
+
+
+def extract_static_visual_frame(path: Path, label: str) -> dict[str, str]:
+    try:
+        import av
+    except ImportError as exc:
+        raise RuntimeError("The saved-media decoder is unavailable.") from exc
+
+    with av.open(str(path)) as container:
+        stream = next((candidate for candidate in container.streams if candidate.type == "video"), None)
+        if stream is None:
+            raise RuntimeError("The saved image could not be decoded.")
+        frame = next(container.decode(stream), None)
+        if frame is None:
+            raise RuntimeError("The saved image did not contain a decodable frame.")
+        return _visual_frame(frame, label)
+
+
 def inspect_saved_media(
     post: dict[str, Any],
     *,
     model_name: str = "small.en",
     model_cache: Path,
     session: requests.Session | None = None,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     assets = list(post.get("_analysis_assets") or [])
     if not assets:
         raise RuntimeError("Instagram did not return a temporary media asset for inspection.")
 
     with tempfile.TemporaryDirectory(prefix="mario-save-analysis-") as temporary:
         temporary_dir = Path(temporary)
-        video = next((asset for asset in assets if asset.get("kind") == "video"), None)
+        is_multi_asset_post = len(assets) > 1 or str(post.get("content_type") or "") == "Carousel"
+        video = None if is_multi_asset_post else next(
+            (asset for asset in assets if asset.get("kind") == "video"),
+            None,
+        )
         if video:
             destination = temporary_dir / "save.mp4"
             download_asset(str(video["url"]), destination, session=session)
             transcript, speech_summary = transcribe_video(destination, model_name, model_cache)
             mechanics = inspect_video_mechanics(destination)
+            visual_frames = extract_video_visual_frames(destination)
             return {
                 "transcript": transcript,
-                "visual_observations": f"{speech_summary} {mechanics}",
+                "visual_observations": (
+                    f"{speech_summary} {mechanics} "
+                    f"{len(visual_frames)} representative frame(s) accompany this evidence."
+                ),
+                "visual_frames": visual_frames,
             }
 
+        visual_frames: list[dict[str, str]] = []
+        for index, asset in enumerate(assets[:MAX_VISUAL_FRAMES]):
+            destination = temporary_dir / f"slide-{index + 1}.media"
+            download_asset(str(asset["url"]), destination, session=session, max_bytes=20 * 1024 * 1024)
+            label = f"Carousel slide {index + 1}" if is_multi_asset_post else "Static post image"
+            visual_frames.append(extract_static_visual_frame(destination, label))
         dimensions = [
             f"slide {index + 1}: {int(asset.get('width') or 0)}x{int(asset.get('height') or 0)}"
             for index, asset in enumerate(assets)
@@ -224,6 +337,7 @@ def inspect_saved_media(
             "visual_observations": (
                 f"Instagram returned {len(assets)} static asset{'s' if len(assets) != 1 else ''}. "
                 f"Known dimensions: {', '.join(dimensions)}. "
-                "No claim is made about slide text or visual subject without frame-level vision evidence."
+                f"{len(visual_frames)} slide frame(s) accompany this evidence for visual inspection."
             ),
+            "visual_frames": visual_frames,
         }

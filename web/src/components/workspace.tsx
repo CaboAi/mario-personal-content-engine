@@ -627,9 +627,10 @@ function SavesInbox({
               <p className="section-label">Step 1 · Automatic delivery inspection</p>
               <h3>The system studies the post. Your notes are optional.</h3>
               <p>
-                The local Instagram sync transcribes speech and sends temporary inspection evidence
-                for structure, hooks, pacing, visuals, and CTA placement. The creator&apos;s topic is
-                quarantined before Mario sources are ranked.
+                The local Instagram sync transcribes speech and sends the transcript plus a few temporary
+                representative frames for structure, hooks, pacing, visuals, and CTA placement. OpenAI
+                storage is disabled for this request, temporary files are deleted locally, and the
+                creator&apos;s topic is quarantined before Mario sources are ranked.
               </p>
               {selectedSave.analysisMethod && (
                 <div className="analysis-proof" role="status">
