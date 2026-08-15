@@ -37,17 +37,16 @@ describe("Production package instructions", () => {
     expect(screen.getByRole("button", { name: "Production" }).getAttribute("aria-current")).toBe("page");
   });
 
-  it("makes technical save-inspection notes optional", () => {
+  it("keeps automatic save-inspection details out of the review workspace", () => {
     render(<Workspace initialData={{
       ...demoData,
       saves: [{ ...demoData.saves[0], status: "New", pairings: [], analysisMethod: undefined }],
     }} />);
     fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
 
-    expect(screen.getByText("The system studies the post. Your notes are optional.")).toBeTruthy();
-    expect(screen.getByText(/what made you save this/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Waiting for automatic inspection" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByText(/Run the local Instagram sync once/)).toBeTruthy();
+    expect(screen.queryByText("The system studies the post. Your notes are optional.")).toBeNull();
+    expect(screen.queryByText(/what made you save this/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /automatic inspection/i })).toBeNull();
   });
 
   it("explains why the three Mario directions are different", () => {
@@ -65,7 +64,9 @@ describe("Production package instructions", () => {
     }} />);
     fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
 
-    expect(screen.getByText("Automatic media inspection")).toBeTruthy();
+    expect(screen.queryByText("Automatic media inspection")).toBeNull();
+    expect(screen.getByText("Step 1 · Mario-owned direction")).toBeTruthy();
+    expect(screen.getByText("Step 2 · Output format")).toBeTruthy();
     expect(screen.getByText("Best structural fit")).toBeTruthy();
     expect(screen.getByText("Different Mario lens")).toBeTruthy();
     expect(screen.getByText("Credible wildcard")).toBeTruthy();

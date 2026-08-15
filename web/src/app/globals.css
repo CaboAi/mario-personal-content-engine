@@ -315,25 +315,6 @@ a { color: inherit; }
 .save-row .status-pill { grid-column: 1 / -1; margin-top: 0.35rem; }
 
 .review-detail { min-width: 0; }
-.analysis-panel {
-  display: grid;
-  grid-template-columns: minmax(14rem, .7fr) minmax(18rem, 1.3fr) auto;
-  gap: 1.2rem;
-  align-items: end;
-  padding: 1.35rem 0;
-  border-bottom: 1px solid var(--ink);
-}
-.analysis-panel h3 { margin: 0; font-size: 1.3rem; font-weight: 580; letter-spacing: -.035em; }
-.analysis-panel p:not(.section-label) { margin: .55rem 0 0; color: var(--muted); font-size: .72rem; line-height: 1.5; }
-.analysis-panel label { display: grid; gap: .4rem; }
-.analysis-panel label span { color: var(--muted); font-size: .62rem; }
-.analysis-panel label small, .analysis-action small { color: var(--muted); font-size: .61rem; line-height: 1.45; }
-.analysis-panel textarea { width: 100%; resize: vertical; padding: .75rem; border: 1px solid var(--line); border-radius: .6rem; background: var(--white); color: var(--ink); font: .72rem/1.5 var(--font-geist-sans), sans-serif; outline: none; }
-.analysis-panel textarea:focus { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
-.analysis-proof { display: grid; gap: .18rem; margin-top: .8rem; padding-left: .7rem; border-left: 2px solid var(--success); }
-.analysis-proof strong { color: var(--ink); font-size: .67rem; }
-.analysis-proof span { color: var(--muted); font-size: .63rem; line-height: 1.45; }
-.analysis-action { display: grid; gap: .45rem; align-self: end; }
 .detail-heading { align-items: center; border-bottom: 1px solid var(--ink); }
 .detail-heading h2 { margin: 0; font-size: 2rem; font-weight: 570; letter-spacing: -0.05em; }
 
@@ -644,7 +625,6 @@ a { color: inherit; }
   .command-grid, .performance-layout { grid-template-columns: 1fr; }
   .system-note { grid-column: 1; }
   .review-layout { grid-template-columns: 1fr; }
-  .analysis-panel { grid-template-columns: 1fr; align-items: stretch; }
   .save-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; border-right: 0; padding-right: 0; }
   .list-heading { grid-column: 1 / -1; }
   .save-row { border: 1px solid var(--line); border-radius: .7rem; }

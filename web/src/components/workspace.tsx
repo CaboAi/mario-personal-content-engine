@@ -76,8 +76,6 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
     suggestedFormat(initialData.saves[0]?.contentType),
   );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [inspectionNotes, setInspectionNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [statusUpdates, setStatusUpdates] = useState<
     Record<string, { saving: boolean; error?: string; saved?: boolean }>
@@ -141,28 +139,6 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
       setError(cause instanceof Error ? cause.message : "Generation failed.");
     } finally {
       setIsGenerating(false);
-    }
-  }
-
-  async function analyzeSave() {
-    if (!selectedSave) return;
-    setError(null);
-    setIsAnalyzing(true);
-    try {
-      const response = await fetch("/api/saves/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ saveId: selectedSave.id, inspectionNotes }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Analysis failed.");
-      const analyzed = result.save as SavedPost;
-      setSaves((items) => items.map((save) => save.id === analyzed.id ? analyzed : save));
-      setSelectedPairingId(analyzed.pairings.find((pairing) => pairing.recommended)?.id || analyzed.pairings[0]?.id);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Analysis failed.");
-    } finally {
-      setIsAnalyzing(false);
     }
   }
 
@@ -405,7 +381,6 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
               );
               setSelectedFormat(suggestedFormat(save.contentType));
               setError(null);
-              setInspectionNotes(save.inspectionNotes || "");
             }}
             onSelectPairing={(pairing) => {
               setSelectedPairingId(pairing.id);
@@ -414,10 +389,6 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             onApprove={approveAndGenerate}
             selectedFormat={selectedFormat}
             onSelectFormat={setSelectedFormat}
-            inspectionNotes={inspectionNotes}
-            onInspectionNotesChange={setInspectionNotes}
-            onAnalyze={analyzeSave}
-            isAnalyzing={isAnalyzing}
             isGenerating={isGenerating}
             error={error}
           />
@@ -556,10 +527,6 @@ function SavesInbox({
   onApprove,
   selectedFormat,
   onSelectFormat,
-  inspectionNotes,
-  onInspectionNotesChange,
-  onAnalyze,
-  isAnalyzing,
   isGenerating,
   error,
 }: {
@@ -572,21 +539,12 @@ function SavesInbox({
   onApprove: () => void;
   selectedFormat: ContentFormat;
   onSelectFormat: (format: ContentFormat) => void;
-  inspectionNotes: string;
-  onInspectionNotesChange: (value: string) => void;
-  onAnalyze: () => void;
-  isAnalyzing: boolean;
   isGenerating: boolean;
   error: string | null;
 }) {
   if (!selectedSave) {
     return <EmptyState title="No saved posts yet" body="The local Instagram bridge will place new saves here." />;
   }
-
-  const dashboardEvidenceReady =
-    selectedSave.status !== "New" ||
-    selectedSave.contentType === "Post" ||
-    inspectionNotes.trim().length >= 40;
 
   return (
     <section className="review-layout stagger-in">
@@ -621,56 +579,6 @@ function SavesInbox({
           </a>
         </div>
 
-        {selectedSave.status !== "Used" && (
-          <div className="analysis-panel">
-            <div>
-              <p className="section-label">Step 1 · Automatic delivery inspection</p>
-              <h3>The system studies the post. Your notes are optional.</h3>
-              <p>
-                The local Instagram sync transcribes speech and sends the transcript plus a few temporary
-                representative frames for structure, hooks, pacing, visuals, and CTA placement. OpenAI
-                storage is disabled for this request, temporary files are deleted locally, and the
-                creator&apos;s topic is quarantined before Mario sources are ranked.
-              </p>
-              {selectedSave.analysisMethod && (
-                <div className="analysis-proof" role="status">
-                  <strong>{selectedSave.analysisMethod}</strong>
-                  <span>{selectedSave.analysisEvidenceSummary || "Delivery evidence is available."}</span>
-                </div>
-              )}
-            </div>
-            <label>
-              <span>Optional context · what made you save this?</span>
-              <textarea
-                value={inspectionNotes}
-                onChange={(event) => onInspectionNotesChange(event.target.value)}
-                placeholder="Example: I liked how quickly it got to the point. Leave this blank if the system already captured it."
-                rows={5}
-              />
-              <small>This can guide emphasis. It never becomes the subject or override the verified Mario source.</small>
-            </label>
-            <div className="analysis-action">
-              <button
-                type="button"
-                className="primary-action"
-                onClick={onAnalyze}
-                disabled={isAnalyzing || !dashboardEvidenceReady}
-              >
-                {isAnalyzing
-                  ? "Building three Mario directions…"
-                  : selectedSave.pairings.length
-                    ? "Rerank three Mario directions"
-                    : dashboardEvidenceReady
-                      ? "Analyze available evidence"
-                      : "Waiting for automatic inspection"}
-              </button>
-              {!dashboardEvidenceReady && (
-                <small>Run the local Instagram sync once. Detailed manual notes remain available only as a fallback.</small>
-              )}
-            </div>
-          </div>
-        )}
-
         {selectedSave.status !== "New" && <div className="dna-grid">
           <DetailBlock label="Framework DNA" text={selectedSave.frameworkDna} />
           <DetailBlock label="Hook mechanics" text={selectedSave.hookMechanics} />
@@ -688,7 +596,7 @@ function SavesInbox({
 
         {selectedSave.status !== "New" && <div className="pairing-heading">
           <div>
-            <p className="section-label">Step 2 · Mario-owned source</p>
+            <p className="section-label">Step 1 · Mario-owned direction</p>
             <h3>Choose one of three different Mario directions</h3>
           </div>
           <span>Choose one verified source</span>
@@ -746,7 +654,7 @@ function SavesInbox({
         {selectedPairing && (
           <div className="format-step">
             <div className="pairing-heading">
-              <div><p className="section-label">Step 3 · Output format</p><h3>Choose what the selected source becomes</h3></div>
+              <div><p className="section-label">Step 2 · Output format</p><h3>Choose what the selected source becomes</h3></div>
               <span>The source stays the same</span>
             </div>
             <p className="format-explainer">This choice controls the deliverable. A saved Reel can become a carousel or written post; only compatible mechanics are adapted.</p>
