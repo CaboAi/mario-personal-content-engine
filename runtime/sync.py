@@ -483,7 +483,18 @@ def sync_post_analysis_to_dashboard(
         },
         timeout=180,
     )
-    response.raise_for_status()
+    if not response.ok:
+        try:
+            failure = response.json()
+        except (requests.JSONDecodeError, ValueError):
+            failure = {}
+        safe_message = (
+            str(failure.get("error") or "").strip()
+            if isinstance(failure, dict)
+            else ""
+        )
+        detail = f": {safe_message}" if safe_message else ""
+        raise RuntimeError(f"Dashboard analysis failed ({response.status_code}){detail}")
     try:
         result = response.json()
     except (requests.JSONDecodeError, ValueError):

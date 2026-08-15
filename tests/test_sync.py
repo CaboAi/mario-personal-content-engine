@@ -377,6 +377,20 @@ class DashboardWriteTests(unittest.TestCase):
         )
         self.assertFalse(analyzed)
 
+    def test_surfaces_safe_dashboard_analysis_error(self):
+        response = self.response(500)
+        response.json.return_value = {"error": "Structured analysis failed validation."}
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"Dashboard analysis failed \(500\): Structured analysis failed validation\.",
+        ):
+            sync.sync_post_analysis_to_dashboard(
+                self.config,
+                {**self.post, "_analysis_assets": [{"url": "private", "kind": "video"}]},
+                inspector=Mock(return_value={"transcript": "Spoken words"}),
+                request_post=Mock(return_value=response),
+            )
+
 
 class DashboardOnlyMainFlowTests(unittest.TestCase):
     def test_dashboard_sync_does_not_require_notion_and_uses_separate_dedupe(self):

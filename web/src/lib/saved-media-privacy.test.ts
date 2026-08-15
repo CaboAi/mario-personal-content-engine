@@ -8,6 +8,10 @@ const ingestRouteSource = readFileSync(
 );
 const persistenceSource = readFileSync(new URL("./save-analysis-service.ts", import.meta.url), "utf8");
 const proxySource = readFileSync(new URL("../proxy.ts", import.meta.url), "utf8");
+const reanalysisMigration = readFileSync(
+  new URL("../../supabase/migrations/0015_reanalysis_pairing_cleanup.sql", import.meta.url),
+  "utf8",
+);
 
 describe("saved-media privacy contract", () => {
   it("disables Responses application-state storage and uses bounded frame inputs", () => {
@@ -27,5 +31,12 @@ describe("saved-media privacy contract", () => {
     expect(persistenceSource).toContain("p_analysis: analysis");
     expect(persistenceSource).not.toContain("visualFrames");
     expect(persistenceSource).not.toContain("transcript:");
+  });
+
+  it("clears stale selected pairings before assigning new reanalysis ranks", () => {
+    expect(reanalysisMigration).toMatch(
+      /delete from public\.pairings\s+where saved_post_id = p_saved_post_id;/,
+    );
+    expect(reanalysisMigration).not.toContain("and selected = false");
   });
 });
