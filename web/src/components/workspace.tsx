@@ -44,7 +44,7 @@ const views = [
 const contentFormats: Array<{ id: ContentFormat; label: string; purpose: string }> = [
   { id: "Yap Reel", label: "Yap Reel", purpose: "One direct argument to camera; optional full script later" },
   { id: "Mini Story", label: "Mini Story", purpose: "A lived scene, turn, and realization; optional full script later" },
-  { id: "POV / Realization", label: "POV / Realization", purpose: "One sendable line with simple B-roll—intentionally lightweight" },
+  { id: "POV / Realization", label: "POV / Realization", purpose: "One sendable realization with simple B-roll; optional short script later" },
   { id: "Carousel", label: "Carousel", purpose: "A complete swipeable visual essay with slide copy" },
   { id: "Written Post", label: "Written Post", purpose: "A nuanced text post; optional full written draft later" },
   { id: "Long-form", label: "Long-form", purpose: "A developed written essay with argument, story, and an optional full draft" },

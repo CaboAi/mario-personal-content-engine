@@ -118,7 +118,7 @@ describe("Production package instructions", () => {
     expect(screen.getByRole("button", { name: "Regenerate" })).toBeTruthy();
   });
 
-  it("does not pad lightweight POV or carousel packages with a script", () => {
+  it("offers an optional short script for a POV realization", () => {
     render(
       <Workspace initialData={{
         ...demoData,
@@ -127,7 +127,21 @@ describe("Production package instructions", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Production/ }));
 
-    expect(screen.queryByRole("button", { name: /Generate full/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Generate full script" })).toBeTruthy();
+    expect(screen.getByText("Stuck on what to say?")).toBeTruthy();
+  });
+
+  it("keeps carousels in the Canva copy workflow without a script option", () => {
+    render(
+      <Workspace initialData={{
+        ...demoData,
+        content: [{ ...generatedDemoPackage, format: "Carousel", status: "Copy Ready" }],
+      }} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Production/ }));
+
+    expect(screen.queryByRole("button", { name: /Generate full script/ })).toBeNull();
+    expect(screen.getByLabelText("Carousel status")).toBeTruthy();
   });
 
   it("keeps posted items out of the active workbench and removes Media ID linking", () => {

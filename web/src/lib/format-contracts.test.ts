@@ -37,12 +37,14 @@ describe("format generation contracts", () => {
     expect(supportsFullDraft("Mini Story")).toBe(true);
     expect(supportsFullDraft("Written Post")).toBe(true);
     expect(supportsFullDraft("Long-form")).toBe(true);
-    expect(supportsFullDraft("POV / Realization")).toBe(false);
+    expect(supportsFullDraft("POV / Realization")).toBe(true);
     expect(supportsFullDraft("Carousel")).toBe(false);
     expect(fullDraftKind("Written Post")).toBe("written draft");
     expect(fullDraftKind("Long-form")).toBe("written draft");
     expect(fullDraftKind("Yap Reel")).toBe("script");
     expect(getFullDraftInstructions("Mini Story")).toContain("scene-first");
+    expect(getFullDraftInstructions("POV / Realization")).toContain("brief, complete spoken script");
+    expect(getFullDraftInstructions("POV / Realization")).toContain("do not add a second argument");
     expect(getFullDraftInstructions("Long-form")).toContain("written piece");
     expect(getFullDraftInstructions("Long-form")).not.toContain("speakable");
   });

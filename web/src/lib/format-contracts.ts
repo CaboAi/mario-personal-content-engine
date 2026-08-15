@@ -56,7 +56,7 @@ export function getFormatGenerationInstructions(format: ContentFormat) {
 }
 
 export function supportsFullDraft(format: ContentFormat) {
-  return format === "Yap Reel" || format === "Mini Story" ||
+  return format === "Yap Reel" || format === "Mini Story" || format === "POV / Realization" ||
     format === "Written Post" || format === "Long-form";
 }
 
@@ -85,6 +85,8 @@ export function getFullDraftInstructions(format: ContentFormat) {
       return "Write a complete short talk-to-camera script with natural spoken rhythm, one developed argument, Mario's receipt early, and no stage directions.";
     case "Mini Story":
       return "Write a complete scene-first spoken script. Preserve the event, felt experience, turn, and realization; do not open with the lesson.";
+    case "POV / Realization":
+      return "Write a brief, complete spoken script for this lightweight POV Reel. Build only enough around the single realization to make it easy to record as voiceover or direct-to-camera. Keep the sendable line central; do not add a second argument, padded explanation, invented story, or stage directions.";
     case "Written Post":
       return "Write a complete written post, not a transcript. Use a personal receipt, developed interpretation, and a strong final thought.";
     case "Long-form":
