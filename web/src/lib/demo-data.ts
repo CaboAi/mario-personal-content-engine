@@ -104,6 +104,7 @@ export const generatedDemoPackage: ContentPackage = {
 export const demoData: DashboardData = {
   saves: [demoSave],
   content: [],
+  batches: [],
   metrics: [],
   sources: [],
   performanceReviews: [],

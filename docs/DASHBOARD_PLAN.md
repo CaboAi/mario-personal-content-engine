@@ -13,14 +13,16 @@ Supabase becomes the application source of truth. Notion remains available as a 
 3. A background analysis job inspects delivery DNA and creates up to three Mario-owned pairings.
 4. Mario reviews a saved post and selects one pairing in the dashboard.
 5. One action generates the creative package and moves it into Production.
-6. Mario moves the item through the workflow for its format: recording stages for Reels, Canva stages for Carousels, and writing stages for Written Post and Long-form.
-7. The official Meta API later attaches analytics snapshots to posted content.
+6. Mario can assign a manual editorial date in the Calendar, which provides a Today focus without scheduling or publishing to Instagram.
+7. Mario moves the item through the workflow for its format: recording stages for Reels, Canva stages for Carousels, and writing stages for Written Post and Long-form.
+8. The official Meta API later attaches analytics snapshots to posted content.
 
 ## MVP screens
 
 - Command Center: queue health, inventory, next decisions, and system status.
 - Saves Inbox: saved media, delivery DNA, forbidden transfer, pairings, approval.
 - Production: content packages and production status.
+- Editorial Calendar: batch-level plan, manual dates, privacy readiness, and Today focus.
 - Performance: connected-account status and comparable metric snapshots.
 - Brand System: source-of-truth rules, pillars, goals, and verified story inventory.
 

@@ -47,12 +47,15 @@ export async function supabaseRequest<T>(
 export async function getDashboardData(): Promise<DashboardData> {
   if (!isLiveMode()) return demoData;
 
-  const [saves, content, metrics, sources, performanceReviews, instagramMedia, accountTrends] = await Promise.all([
+  const [saves, content, batches, metrics, sources, performanceReviews, instagramMedia, accountTrends] = await Promise.all([
     supabaseRequest<DashboardData["saves"]>(
       "dashboard_saved_posts?select=*&order=savedAt.desc",
     ),
     supabaseRequest<DashboardData["content"]>(
       "dashboard_content_items?select=*&order=createdAt.desc",
+    ),
+    supabaseRequest<DashboardData["batches"]>(
+      "dashboard_content_batches?select=*&order=startsOn.asc.nullslast,createdAt.desc",
     ),
     supabaseRequest<DashboardData["metrics"]>(
       "dashboard_metric_snapshots?select=*&order=capturedAt.desc",
@@ -74,6 +77,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   return {
     saves,
     content,
+    batches,
     metrics,
     sources,
     performanceReviews,

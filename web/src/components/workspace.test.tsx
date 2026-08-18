@@ -30,11 +30,36 @@ describe("Production package instructions", () => {
     expect(screen.getByText("Home")).toBeTruthy();
     expect(screen.getByText("Saves")).toBeTruthy();
     expect(screen.getByText("Make")).toBeTruthy();
+    expect(screen.getByText("Plan")).toBeTruthy();
     expect(screen.getByText("Results")).toBeTruthy();
     expect(screen.getByText("Brand")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Production" }));
     expect(screen.getByRole("button", { name: "Production" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("shows batch packages in the editorial calendar and permits a date change", async () => {
+    const item = { ...generatedDemoPackage, id: "calendar-package", batchId: "batch-1", plannedFor: "2026-08-17" };
+    render(<Workspace initialData={{
+      ...demoData,
+      content: [item],
+      batches: [{
+        id: "batch-1",
+        title: "15-Day Content Test Calendar",
+        description: "Test batch",
+        timezone: "America/Chihuahua",
+        startsOn: "2026-08-17",
+        endsOn: "2026-08-31",
+        createdAt: "2026-08-16T00:00:00Z",
+      }],
+    }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Calendar" }));
+    expect(screen.getByText("Editorial calendar")).toBeTruthy();
+    expect(screen.getByText(item.title)).toBeTruthy();
+    const date = screen.getByLabelText(`Planned date for ${item.title}`);
+    fireEvent.change(date, { target: { value: "2026-08-18" } });
+    await waitFor(() => expect((date as HTMLInputElement).value).toBe("2026-08-18"));
   });
 
   it("keeps automatic save-inspection details out of the review workspace", () => {

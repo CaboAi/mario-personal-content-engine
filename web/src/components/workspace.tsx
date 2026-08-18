@@ -3,11 +3,13 @@
 import { useState } from "react";
 import {
   BookmarkSimple,
+  CalendarBlank,
   ChartLineUp,
   House,
   Palette,
   VideoCamera,
 } from "@phosphor-icons/react";
+import { EditorialCalendar } from "@/components/editorial-calendar";
 import type {
   BrandSourceInventory,
   ContentFormat,
@@ -25,14 +27,15 @@ import { generatedDemoPackage } from "@/lib/demo-data";
 import { fullDraftKind, initialProductionStatus, productionStatusesFor, supportsFullDraft } from "@/lib/format-contracts";
 import { getExperimentMetricRows } from "@/lib/performance";
 
-type View = "command" | "saves" | "production" | "performance" | "brand";
+type View = "command" | "saves" | "production" | "calendar" | "performance" | "brand";
 
 const views = [
   { id: "command", label: "Command Center", shortLabel: "Home", index: "01", icon: House },
   { id: "saves", label: "Saves Inbox", shortLabel: "Saves", index: "02", icon: BookmarkSimple },
   { id: "production", label: "Production", shortLabel: "Make", index: "03", icon: VideoCamera },
-  { id: "performance", label: "Performance", shortLabel: "Results", index: "04", icon: ChartLineUp },
-  { id: "brand", label: "Brand System", shortLabel: "Brand", index: "05", icon: Palette },
+  { id: "calendar", label: "Calendar", shortLabel: "Plan", index: "04", icon: CalendarBlank },
+  { id: "performance", label: "Performance", shortLabel: "Results", index: "05", icon: ChartLineUp },
+  { id: "brand", label: "Brand System", shortLabel: "Brand", index: "06", icon: Palette },
 ] satisfies Array<{
   id: View;
   label: string;
@@ -64,6 +67,17 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function editorialToday(timeZone = "America/Chihuahua") {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [view, setView] = useState<View>("command");
   const [saves, setSaves] = useState(initialData.saves);
@@ -88,6 +102,9 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   >(null);
   const [scriptUpdates, setScriptUpdates] = useState<
     Record<string, { generating: boolean; error?: string }>
+  >({});
+  const [scheduleUpdates, setScheduleUpdates] = useState<
+    Record<string, { saving: boolean; error?: string }>
   >({});
 
   const selectedSave = saves.find((save) => save.id === selectedSaveId);
@@ -302,6 +319,31 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
     }
   }
 
+  async function updatePlannedDate(id: string, plannedFor: string | null) {
+    const previous = content.find((item) => item.id === id);
+    if (!previous || previous.plannedFor === plannedFor) return;
+    setContent((items) => items.map((item) => item.id === id ? { ...item, plannedFor: plannedFor ?? undefined } : item));
+    setScheduleUpdates((updates) => ({ ...updates, [id]: { saving: true } }));
+    try {
+      if (initialData.liveMode) {
+        const response = await fetch(`/api/content/${encodeURIComponent(id)}/schedule`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plannedFor }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.content) throw new Error(result.error || "Schedule update failed.");
+        setContent((items) => items.map((item) => item.id === id ? { ...item, ...result.content } : item));
+      } else {
+        await new Promise((resolve) => window.setTimeout(resolve, 200));
+      }
+      setScheduleUpdates((updates) => ({ ...updates, [id]: { saving: false } }));
+    } catch (cause) {
+      setContent((items) => items.map((item) => item.id === id ? previous : item));
+      setScheduleUpdates((updates) => ({ ...updates, [id]: { saving: false, error: cause instanceof Error ? cause.message : "Schedule update failed." } }));
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="side-rail">
@@ -364,6 +406,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             content={content}
             onOpenSaves={() => setView("saves")}
             onOpenProduction={() => setView("production")}
+            onOpenCalendar={() => setView("calendar")}
           />
         )}
 
@@ -408,6 +451,16 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
           />
         )}
 
+        {view === "calendar" && (
+          <EditorialCalendar
+            batches={initialData.batches}
+            content={content}
+            onReschedule={updatePlannedDate}
+            onOpenProduction={() => setView("production")}
+            scheduleUpdates={scheduleUpdates}
+          />
+        )}
+
         {view === "performance" && (
           <PerformanceLab
             connected={initialData.analyticsConnected}
@@ -433,6 +486,7 @@ function CommandCenter({
   content,
   onOpenSaves,
   onOpenProduction,
+  onOpenCalendar,
 }: {
   reviewCount: number;
   readyCount: number;
@@ -441,8 +495,14 @@ function CommandCenter({
   content: ContentPackage[];
   onOpenSaves: () => void;
   onOpenProduction: () => void;
+  onOpenCalendar: () => void;
 }) {
-  const priority = reviewCount > 0 ? "Review the latest saved-post pairing" : "Capture a new Mario story";
+  const today = editorialToday();
+  const upcoming = content
+    .filter((item) => !item.archivedAt && item.status !== "Posted" && item.plannedFor)
+    .sort((a, b) => (a.plannedFor ?? "").localeCompare(b.plannedFor ?? ""));
+  const todayItem = upcoming.find((item) => item.plannedFor === today) ?? upcoming.find((item) => (item.plannedFor ?? "") > today);
+  const priority = todayItem ? todayItem.title : reviewCount > 0 ? "Review the latest saved-post pairing" : "Capture a new Mario story";
 
   return (
     <section className="command-grid stagger-in">
@@ -450,12 +510,9 @@ function CommandCenter({
         <p className="section-label">Today’s decision</p>
         <h2>{priority}</h2>
         <p>
-          The engine can prepare the structure. The decision that matters is which
-          Mario-owned truth deserves the format.
+          {todayItem ? `Today focus: ${todayItem.format} · ${todayItem.goal} · ${todayItem.selectedHook}` : "The engine can prepare the structure. The decision that matters is which Mario-owned truth deserves the format."}
         </p>
-        <button className="primary-action" onClick={onOpenSaves} type="button">
-          Open review queue
-        </button>
+        <div className="command-actions"><button className="primary-action" onClick={todayItem ? onOpenProduction : onOpenSaves} type="button">{todayItem ? "Open Today focus" : "Open review queue"}</button><button className="text-action" onClick={onOpenCalendar} type="button">View editorial calendar</button></div>
       </div>
 
       <div className="metric-ribbon" aria-label="Workflow summary">
@@ -734,11 +791,19 @@ function ProductionBoard({
   scriptUpdates: Record<string, { generating: boolean; error?: string }>;
 }) {
   const [showPosted, setShowPosted] = useState(false);
+  const [showFullBatch, setShowFullBatch] = useState(false);
   const [copiedScriptId, setCopiedScriptId] = useState<string | null>(null);
   const activeContent = content.filter((item) => !item.archivedAt && item.status !== "Posted");
   const postedContent = content.filter((item) => !item.archivedAt && item.status === "Posted");
   const removedContent = content.filter((item) => Boolean(item.archivedAt));
-  const visibleContent = showPosted ? [...activeContent, ...postedContent] : activeContent;
+  const today = editorialToday();
+  const scheduledActive = activeContent
+    .filter((item) => item.plannedFor)
+    .sort((a, b) => (a.plannedFor ?? "").localeCompare(b.plannedFor ?? ""));
+  const nextFocus = scheduledActive.filter((item) => (item.plannedFor ?? "") >= today).slice(0, 3);
+  const focusedContent = nextFocus.length > 0 ? nextFocus : activeContent;
+  const productionContent = showFullBatch ? activeContent : focusedContent;
+  const visibleContent = showPosted ? [...productionContent, ...postedContent] : productionContent;
 
   if (content.length === 0) {
     return (
@@ -754,13 +819,9 @@ function ProductionBoard({
       <div className="production-toolbar">
         <div>
           <p className="section-label">Active workbench</p>
-          <span>{activeContent.length} active {activeContent.length === 1 ? "package" : "packages"}</span>
+          <span>{`${activeContent.length} active ${activeContent.length === 1 ? "package" : "packages"}`}{!showFullBatch && <small>{`${focusedContent.length} in Today focus`}</small>}</span>
         </div>
-        {postedContent.length > 0 && (
-          <button type="button" className="text-action" onClick={() => setShowPosted((current) => !current)}>
-            {showPosted ? "Hide posted archive" : `Show posted archive (${postedContent.length})`}
-          </button>
-        )}
+        <div className="production-toolbar-actions"><button type="button" className="text-action" onClick={() => setShowFullBatch((current) => !current)}>{showFullBatch ? "Show Today focus" : `View full batch (${activeContent.length})`}</button>{postedContent.length > 0 && (<button type="button" className="text-action" onClick={() => setShowPosted((current) => !current)}>{showPosted ? "Hide posted archive" : `Show posted archive (${postedContent.length})`}</button>)}</div>
       </div>
       {archiveFeedback && (
         <p

@@ -5,7 +5,7 @@
 The engine has three operating surfaces:
 
 1. **Repository:** canonical brand knowledge, generation rules, templates, optional sync runtime, and future design/export assets.
-2. **Dashboard + Supabase:** saved-post review, verified source inventory, format-aware content production, and fixed-window performance evidence.
+2. **Dashboard + Supabase:** saved-post review, verified source inventory, editorial batches/calendar, format-aware content production, and fixed-window performance evidence.
 3. **Notion (optional mirror):** migration-period visibility for teams or workflows that still use it.
 
 The repository remains the canonical brand logic. Supabase is the dashboard runtime store. Notion is not a runtime dependency.
@@ -22,7 +22,7 @@ Verified Mario source inventory (Supabase)
 Goal + hooks + one test variable
               |
               v
-Content Production (dashboard)
+Editorial Calendar + Content Production (dashboard)
               |
        write / design / record / edit
               |
@@ -56,7 +56,8 @@ Same-window signal + next controlled test
 
 - The topic source is personal experience, not buyer pain or saved-post captions.
 - The existing Content Production database replaces the old source engine's separate Content Ideas database.
-- Publishing Calendar and Performance Lab remain views of Content Production.
+- The Editorial Calendar holds manual batch dates and Today focus; it is separate from actual publishing time and never posts to Instagram.
+- Performance Lab remains tied to actual matched Instagram media, not editorial dates.
 - Hook Swipe File stores patterns and Mario adaptations, not wholesale copied ideas.
 - The primary content formats are Yap Reel, Mini Story, POV / Realization, Carousel, Written Post, and Long-form.
 - Primary themes are Reinvention, Identity, Standards, Action, Responsibility, Self-Respect, Perspective, and Life Story.

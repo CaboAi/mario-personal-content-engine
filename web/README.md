@@ -28,7 +28,7 @@ The complete environment-variable checklist, deployment flow, local bridge hando
 
 ## Workflow
 
-`Instagram Save → inspect delivery mechanics → choose one Mario source → choose output format → Production → post from phone → Instagram sync → performance review`
+`Instagram Save → inspect delivery mechanics → choose one Mario source → choose output format → Editorial Calendar → Today focus / Production → post from phone → Instagram sync → performance review`
 
 Saved posts contribute delivery DNA only. A verified Mario source supplies the story, opinion, and lesson.
 Analysis intentionally requires human-observed notes from the actual post; a Reel or Carousel is never analyzed from its caption alone.
@@ -40,7 +40,8 @@ The seed is idempotent and the dashboard does not read Notion during analysis or
 ## Performance and production
 
 - The authenticated **Import existing posts** action imports Mario's published Instagram media, available lifetime media insights, and up to 90 days of available account-level series into Supabase. Re-running it is idempotent.
-- Production is a phone-first, one-project-at-a-time workbench. Marking an item `Posted` archives it from the default view; **Remove from Production** parks an unfinished draft in a recoverable archive. No Instagram Media ID is required. The next Instagram sync brings phone-published posts into the existing-post library and, when the caption provides enough evidence, proposes a dashboard-package match for Mario to confirm.
+- The Editorial Calendar groups planned packages into batches, shows a daily queue, and supports manual date changes. It never schedules or publishes to Instagram; the planned date remains separate from the actual publishing timestamp and performance-review windows.
+- Production is a phone-first workbench with a Today focus (today's package and the next two). Marking an item `Posted` archives it from the default view; **Remove from Production** parks an unfinished draft in a recoverable archive. No Instagram Media ID is required. The next Instagram sync brings phone-published posts into the existing-post library and, when the caption provides enough evidence, proposes a dashboard-package match for Mario to confirm.
 - Every Production package separately names its **Mario-owned substance** and its **delivery influence from Saves Inbox**, including the saved creator, original post link, and the exact framework, hook, and visual mechanics that were adapted. Saved creators never supply the topic or message.
 - Yap Reels, Mini Stories, Written Posts, and Long-form packages offer an optional persisted full script or written draft when the scaffold is not enough. The draft is generated only on request from the same Clear + Verified Mario source. POV / Realization stays intentionally lightweight, and Carousel packages use their complete slide copy instead of padded scripts.
 - Performance is separated into account trends, the existing-post baseline, dashboard experiments, and winners/patterns. Historical lifetime totals are never presented as retroactive 24-hour or 7-day snapshots.

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run --config ./vitest.config.mts",
-    "seed:sources": "node scripts/seed-brand-sources.mjs"
+    "seed:sources": "node scripts/seed-brand-sources.mjs",
+    "import:15-day": "node scripts/import-15-day-test-batch.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

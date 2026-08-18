@@ -98,9 +98,11 @@ export type CarouselSlide = {
 
 export type ContentPackage = {
   id: string;
+  batchId?: string;
   title: string;
   sourceSaveId?: string;
   sourceTitle: string;
+  sourceReference?: string;
   format: ContentFormat;
   goal: "Reach" | "Shares" | "Saves" | "Follows" | "Trust";
   pillars: string[];
@@ -109,6 +111,7 @@ export type ContentPackage = {
   onScreenHooks: string[];
   selectedHook: string;
   selectedOnScreenHook: string;
+  hookRationale?: string;
   testVariable: "Hook" | "Topic" | "Length" | "Format" | "CTA" | "Visual" | "None";
   hypothesis: string;
   skeleton: string[];
@@ -118,12 +121,27 @@ export type ContentPackage = {
   cta?: string;
   caption?: string;
   carouselSlides: CarouselSlide[];
+  productionNotes?: string;
+  privacyNotes?: string;
+  publicationClearance?: boolean;
   instagramMediaId?: string;
   instagramPermalink?: string;
   mediaProductType?: string;
   postDate?: string;
+  plannedFor?: string;
   archivedAt?: string | null;
   platforms: string[];
+  createdAt: string;
+};
+
+export type ContentBatch = {
+  id: string;
+  title: string;
+  description: string;
+  sourceUrl?: string;
+  timezone: string;
+  startsOn?: string;
+  endsOn?: string;
   createdAt: string;
 };
 
@@ -212,6 +230,7 @@ export type InstagramAccountDaily = {
 export type DashboardData = {
   saves: SavedPost[];
   content: ContentPackage[];
+  batches: ContentBatch[];
   metrics: MetricSnapshot[];
   sources: BrandSourceInventory[];
   performanceReviews: PerformanceReview[];

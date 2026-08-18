@@ -51,19 +51,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    const activeContent = await supabaseRequest<Array<{ id: string }>>(
-      "content_items?archived_at=is.null&status=neq.Posted&select=id&limit=1",
-    );
-    if (activeContent[0]) {
-      return NextResponse.json(
-        {
-          error: "Another production project is already active.",
-          contentId: activeContent[0].id,
-        },
-        { status: 409 },
-      );
-    }
-
     const generated = await generateContentPackage(save, pairing, parsed.data.format);
     const created = await supabaseRequest<Array<Record<string, unknown>>>(
       "rpc/promote_pairing",
