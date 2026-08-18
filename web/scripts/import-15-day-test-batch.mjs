@@ -3,7 +3,7 @@ import http from "node:http";
 import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { batch, fifteenDayItems } from "../data/fifteen-day-test-batch.mjs";
+import { batch, fifteenDayItems } from "../data/fifteen-day-test-batch-notion.mjs";
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -62,11 +62,25 @@ async function request(path, init = {}) {
   });
 }
 
-function initialStatus(format) {
+function initialStatus(item) {
+  if (item.notionStatus) return item.notionStatus;
+  const { format } = item;
   if (format === "Carousel") return "Copy Ready";
   if (format === "POV / Realization") return "Concept Ready";
   if (format === "Written Post" || format === "Long-form") return "Outline Ready";
   return "Script Ready";
+}
+
+function statusFitsFormat(format, status) {
+  const permitted = {
+    "Yap Reel": ["Script Ready", "Ready to Record", "Recorded", "Edited", "Scheduled", "Posted"],
+    "Mini Story": ["Script Ready", "Ready to Record", "Recorded", "Edited", "Scheduled", "Posted"],
+    "POV / Realization": ["Concept Ready", "Ready to Record", "Recorded", "Edited", "Scheduled", "Posted"],
+    "Carousel": ["Copy Ready", "Designing in Canva", "Design Ready", "Posted"],
+    "Written Post": ["Outline Ready", "Drafting", "Final Copy", "Scheduled", "Posted"],
+    "Long-form": ["Outline Ready", "Drafting", "Final Copy", "Scheduled", "Posted"],
+  };
+  return permitted[format]?.includes(status) ?? false;
 }
 
 async function upsertBatch() {
@@ -110,7 +124,7 @@ async function upsertSource() {
 }
 
 async function upsertItem(item, batchId, sourceId) {
-  const existing = await request(`content_items?import_key=eq.${encodeURIComponent(item.importKey)}&select=id`);
+  const existing = await request(`content_items?import_key=eq.${encodeURIComponent(item.importKey)}&select=id,status,format,post_date`);
   const sharedPayload = {
     batch_id: batchId,
     brand_source_id: sourceId,
@@ -141,10 +155,15 @@ async function upsertItem(item, batchId, sourceId) {
     platforms: item.platforms,
     updated_at: new Date().toISOString(),
   };
+  const lockedEditorialState = item.notionStatus
+    ? { status: item.notionStatus, ...(item.postDate ? { post_date: item.postDate } : {}) }
+    : existing[0] && !statusFitsFormat(item.format, existing[0].status)
+      ? { status: initialStatus(item) }
+      : {};
   if (existing[0]) {
     // A re-import refreshes the approved package without undoing editorial work.
     // Scheduling, production status, and archival state belong to the operator.
-    await request(`content_items?id=eq.${existing[0].id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(sharedPayload) });
+    await request(`content_items?id=eq.${existing[0].id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ...sharedPayload, ...lockedEditorialState }) });
   } else {
     await request("content_items", {
       method: "POST",
@@ -152,8 +171,9 @@ async function upsertItem(item, batchId, sourceId) {
       body: JSON.stringify({
         ...sharedPayload,
         planned_for: item.plannedFor,
-        status: initialStatus(item.format),
+        status: initialStatus(item),
         archived_at: null,
+        ...(item.postDate ? { post_date: item.postDate } : {}),
       }),
     });
   }
