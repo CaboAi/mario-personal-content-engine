@@ -61,4 +61,12 @@ describe("selectDiversePairings", () => {
     ]);
     expect(result.map((item) => item.brandSourceId)).toEqual(["current"]);
   });
+
+  it("never selects an expired Dispatch source", () => {
+    const result = selectDiversePairings([
+      candidate({ brandSourceId: "expired", sourceTitle: "Expired Dispatch", sourceType: "Dispatch", dispatchOccurredOn: "2026-07-01", dispatchFreshnessDays: 30, fitScore: 99 }),
+      candidate({ brandSourceId: "current", sourceTitle: "Current Story", fitScore: 80 }),
+    ]);
+    expect(result.map((item) => item.brandSourceId)).toEqual(["current"]);
+  });
 });

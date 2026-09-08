@@ -75,6 +75,20 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function isPairingAvailableForSelection(pairing: Pairing) {
+  if (pairing.sourceType === "Existing Content") return false;
+  if (pairing.privacyStatus !== "Clear") return false;
+  return isSourceAvailableForPairing({ ...pairing, retired: pairing.retired ?? false });
+}
+
+function availablePairings(save?: SavedPost) {
+  return (save?.pairings ?? []).filter(isPairingAvailableForSelection);
+}
+
+function defaultModeForPairing(pairing?: Pairing): ContentMode {
+  return pairing?.sourceType === "Dispatch" ? "Dispatch" : "Practical";
+}
+
 function editorialToday(timeZone = "America/Chihuahua") {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -93,12 +107,14 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [sources, setSources] = useState(initialData.sources);
   const [selectedSaveId, setSelectedSaveId] = useState(initialData.saves[0]?.id);
   const [selectedPairingId, setSelectedPairingId] = useState<string | undefined>(
-    initialData.saves[0]?.pairings.find((pairing) => pairing.recommended)?.id,
+    availablePairings(initialData.saves[0]).find((pairing) => pairing.recommended)?.id ?? availablePairings(initialData.saves[0])[0]?.id,
   );
   const [selectedFormat, setSelectedFormat] = useState<ContentFormat>(
     suggestedFormat(initialData.saves[0]?.contentType),
   );
-  const [selectedMode, setSelectedMode] = useState<ContentMode>("Dispatch");
+  const [selectedMode, setSelectedMode] = useState<ContentMode>(() =>
+    defaultModeForPairing(availablePairings(initialData.saves[0]).find((pairing) => pairing.recommended) ?? availablePairings(initialData.saves[0])[0]),
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusUpdates, setStatusUpdates] = useState<
@@ -118,7 +134,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   >({});
 
   const selectedSave = saves.find((save) => save.id === selectedSaveId);
-  const selectedPairing = selectedSave?.pairings.find(
+  const selectedPairing = availablePairings(selectedSave).find(
     (pairing) => pairing.id === selectedPairingId,
   );
   const reviewCount = saves.filter((save) => save.status === "Needs Review").length;
@@ -429,16 +445,21 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             selectedPairing={selectedPairing}
             selectedPairingId={selectedPairingId}
             onSelectSave={(save) => {
+              const pairings = availablePairings(save);
+              const pairing = pairings.find((candidate) => candidate.recommended) ?? pairings[0];
               setSelectedSaveId(save.id);
-              setSelectedPairingId(
-                save.pairings.find((pairing) => pairing.recommended)?.id ||
-                  save.pairings[0]?.id,
-              );
-              setSelectedFormat(suggestedFormat(save.contentType));
+              setSelectedPairingId(pairing?.id);
+              const mode = defaultModeForPairing(pairing);
+              setSelectedMode(mode);
+              const suggested = suggestedFormat(save.contentType);
+              setSelectedFormat(getLegalFormats(mode).includes(suggested) ? suggested : getLegalFormats(mode)[0]);
               setError(null);
             }}
             onSelectPairing={(pairing) => {
               setSelectedPairingId(pairing.id);
+              const mode = defaultModeForPairing(pairing);
+              setSelectedMode(mode);
+              if (!getLegalFormats(mode).includes(selectedFormat)) setSelectedFormat(getLegalFormats(mode)[0]);
               setError(null);
             }}
             onApprove={approveAndGenerate}
@@ -451,6 +472,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             onSelectFormat={setSelectedFormat}
             isGenerating={isGenerating}
             error={error}
+            onOpenCapture={() => setView("capture")}
           />
         )}
 
@@ -595,6 +617,21 @@ function Metric({ value, label }: { value: number; label: string }) {
   );
 }
 
+function modeAvailability(pairing: Pairing, pairings: Pairing[], mode: ContentMode) {
+  if (mode === "Dispatch" && pairing.sourceType !== "Dispatch") {
+    return {
+      enabled: false,
+      reason: pairings.some((candidate) => candidate.sourceType === "Dispatch")
+        ? "Choose a fresh Dispatch direction first."
+        : "No fresh Dispatch source captured.",
+    };
+  }
+  if (mode === "Reflection" && pairing.sourceType === "Dispatch") {
+    return { enabled: false, reason: "Dispatch sources cannot feed Reflection." };
+  }
+  return { enabled: true };
+}
+
 function SavesInbox({
   saves,
   selectedSave,
@@ -609,6 +646,7 @@ function SavesInbox({
   onSelectFormat,
   isGenerating,
   error,
+  onOpenCapture,
 }: {
   saves: SavedPost[];
   selectedSave?: SavedPost;
@@ -623,10 +661,16 @@ function SavesInbox({
   onSelectFormat: (format: ContentFormat) => void;
   isGenerating: boolean;
   error: string | null;
+  onOpenCapture: () => void;
 }) {
   if (!selectedSave) {
     return <EmptyState title="No saved posts yet" body="The local Instagram bridge will place new saves here." />;
   }
+
+  const selectablePairings = availablePairings(selectedSave);
+  const selectedModeAvailability = selectedPairing
+    ? modeAvailability(selectedPairing, selectablePairings, selectedMode)
+    : { enabled: false, reason: "Choose a Mario-owned direction first." };
 
   return (
     <section className="review-layout stagger-in">
@@ -679,9 +723,9 @@ function SavesInbox({
         {selectedSave.status !== "New" && <div className="pairing-heading">
           <div>
             <p className="section-label">Step 1 · Mario-owned direction</p>
-            <h3>Choose one of three different Mario directions</h3>
+            <h3>{selectablePairings.length === 3 ? "Choose one of three different Mario directions" : "Choose a Mario direction"}</h3>
           </div>
-          <span>Choose one verified source</span>
+          <span>{selectablePairings.length} verified source{selectablePairings.length === 1 ? "" : "s"} available</span>
         </div>}
 
         {selectedSave.status !== "New" && (
@@ -699,8 +743,18 @@ function SavesInbox({
           </div>
         )}
 
+        {selectedSave.status !== "New" && selectablePairings.length === 0 && (
+          <section className="empty-state source-empty-state">
+            <span className="empty-line" />
+            <p className="section-label">No usable Mario source</p>
+            <h3>Capture material before choosing a direction.</h3>
+            <p>Retired and expired sources cannot feed generation.</p>
+            <button className="primary-action" type="button" onClick={onOpenCapture}>Capture a source</button>
+          </section>
+        )}
+
         <div className="pairing-stack">
-          {selectedSave.pairings.map((pairing, index) => (
+          {selectablePairings.map((pairing, index) => (
             <button
               type="button"
               key={pairing.id}
@@ -727,7 +781,7 @@ function SavesInbox({
           ))}
         </div>
 
-        {selectedSave.status === "Blocked" && selectedSave.pairings.length === 0 && (
+        {selectedSave.status === "Blocked" && selectablePairings.length === 0 && (
           <p className="inline-error" role="status">
             No verified Mario source fits this delivery structure yet. Add or verify a source, then re-run analysis.
           </p>
@@ -742,22 +796,25 @@ function SavesInbox({
             </div>
             <p className="format-explainer">Dispatches report progress, Practical pieces leave a usable artifact, and Reflections make a dated claim from a past event.</p>
             <div className="format-picker" role="radiogroup" aria-label="Content mode">
-              {contentModes.map((mode) => (
-                <button
+              {contentModes.map((mode) => {
+                const availability = modeAvailability(selectedPairing, selectablePairings, mode.id);
+                return <button
                   key={mode.id}
                   type="button"
                   role="radio"
                   aria-checked={selectedMode === mode.id}
                   className={selectedMode === mode.id ? "format-option selected" : "format-option"}
+                  disabled={!availability.enabled}
+                  title={availability.reason}
                   onClick={() => onSelectMode(mode.id)}
                 >
-                  <strong>{mode.label}</strong><span>{mode.purpose}</span>
+                  <strong>{mode.label}</strong><span>{availability.reason ?? mode.purpose}</span>
                 </button>
-              ))}
+              })}
             </div>
           </div>
 
-          <div className="format-step">
+          {selectedModeAvailability.enabled && <div className="format-step">
             <div className="pairing-heading">
               <div><p className="section-label">Step 3 · Output format</p><h3>Choose the delivery for this mode</h3></div>
               <span>Only legal mode-format pairs are available</span>
@@ -777,11 +834,11 @@ function SavesInbox({
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
           </>
         )}
 
-        {selectedPairing && (
+        {selectedPairing && selectedModeAvailability.enabled && (
           <div className="approval-dock">
             <div>
               <p className="section-label">Ready to build · {selectedMode} · {selectedFormat}</p>

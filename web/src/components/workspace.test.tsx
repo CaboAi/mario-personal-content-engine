@@ -81,6 +81,10 @@ describe("Production package instructions", () => {
         analysisEvidenceSummary: "Speech and delivery evidence inspected without storing creator media.",
         pairings: demoData.saves[0].pairings.map((pairing, index) => ({
           ...pairing,
+          brandSourceId: `current-source-${index}`,
+          sourceType: "Story" as const,
+          privacyStatus: "Clear" as const,
+          retired: false,
           selectionRole: (["Best structural fit", "Different Mario lens", "Credible wildcard"] as const)[index],
         })),
       }],
@@ -512,8 +516,68 @@ describe("Live brand source inventory", () => {
 });
 
 describe("Save source and format decisions", () => {
+  it("never offers retired directions", () => {
+    render(<Workspace initialData={{
+      ...demoData,
+      saves: [{
+        ...demoData.saves[0],
+        pairings: [
+          { ...demoData.saves[0].pairings[0], id: "retired", title: "Retired direction", sourceType: "Story", brandSourceId: "retired-source", privacyStatus: "Clear", retired: true },
+          { ...demoData.saves[0].pairings[1], id: "current", title: "Current direction", sourceType: "Story", brandSourceId: "current-source", privacyStatus: "Clear", retired: false },
+        ],
+      }],
+    }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
+
+    expect(screen.queryByText("Retired direction")).toBeNull();
+    expect(screen.getAllByText("Current direction")).toHaveLength(2);
+  });
+
+  it("shows Capture instead of directions when no usable source remains", () => {
+    render(<Workspace initialData={{
+      ...demoData,
+      saves: [{
+        ...demoData.saves[0],
+        pairings: demoData.saves[0].pairings.map((pairing) => ({ ...pairing, retired: true })),
+      }],
+    }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
+
+    expect(screen.getByText("No usable Mario source")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Generate/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Capture a source" }));
+    expect(screen.getByRole("heading", { name: "Capture" })).toBeTruthy();
+  });
+
+  it("disables Dispatch when the selected direction has no fresh Dispatch source", () => {
+    render(<Workspace initialData={{
+      ...demoData,
+      saves: [{
+        ...demoData.saves[0],
+        pairings: [{
+          ...demoData.saves[0].pairings[1], id: "story-direction", sourceType: "Story",
+          brandSourceId: "story-source", privacyStatus: "Clear", retired: false,
+        }],
+      }],
+    }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
+
+    const dispatch = screen.getByRole("radio", { name: /Dispatch/ }) as HTMLButtonElement;
+    expect(dispatch.disabled).toBe(true);
+    expect(screen.getByText("No fresh Dispatch source captured.")).toBeTruthy();
+  });
+
   it("separates delivery mechanics, Mario substance, and output format", () => {
-    render(<Workspace initialData={demoData} />);
+    render(<Workspace initialData={{
+      ...demoData,
+      saves: [{
+        ...demoData.saves[0],
+        pairings: demoData.saves[0].pairings.map((pairing, index) => ({
+          ...pairing, brandSourceId: `current-${index}`, sourceType: "Story" as const,
+          privacyStatus: "Clear" as const, retired: false,
+        })),
+      }],
+    }} />);
     fireEvent.click(screen.getByRole("button", { name: /Saves Inbox/ }));
 
     expect(screen.getByText("Saved post contributes")).toBeTruthy();
