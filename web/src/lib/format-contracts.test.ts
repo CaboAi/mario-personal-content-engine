@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { ContentFormat } from "./domain";
+import type { ContentFormat, ContentMode } from "./domain";
 import {
   fullDraftKind,
   getFormatGenerationInstructions,
   getFullDraftInstructions,
+  getLegalFormats,
   initialProductionStatus,
   isProductionStatusForFormat,
+  isLegalModeFormat,
   productionStatusesFor,
   supportsFullDraft,
 } from "./format-contracts";
@@ -21,15 +23,33 @@ const formats: ContentFormat[] = [
 
 describe("format generation contracts", () => {
   it("defines a distinct non-empty generation contract for all six formats", () => {
-    const contracts = formats.map(getFormatGenerationInstructions);
+    const contracts = formats.map((format) => getFormatGenerationInstructions(
+      format === "Mini Story" ? "Reflection" : "Dispatch",
+      format,
+    ));
     expect(contracts.every((contract) => contract.length > 80)).toBe(true);
     expect(new Set(contracts)).toHaveLength(formats.length);
   });
 
   it("keeps POV lightweight and carousel slide-based", () => {
-    expect(getFormatGenerationInstructions("POV / Realization")).toContain("no padded script");
-    expect(getFormatGenerationInstructions("Carousel")).toContain("2-10 slides");
-    expect(getFormatGenerationInstructions("Long-form")).toContain("do not insert short-Reel production directions");
+    expect(getFormatGenerationInstructions("Dispatch", "POV / Realization")).toContain("30-45 seconds");
+    expect(getFormatGenerationInstructions("Practical", "Carousel")).toContain("2-10 slides");
+    expect(getFormatGenerationInstructions("Reflection", "Long-form")).toContain("dated claim");
+  });
+
+  it("enforces the legal content-mode and format matrix", () => {
+    const expected: Record<ContentMode, ContentFormat[]> = {
+      Dispatch: ["Yap Reel", "POV / Realization", "Carousel", "Written Post", "Long-form"],
+      Practical: ["Yap Reel", "Carousel", "Written Post", "Long-form"],
+      Reflection: ["Yap Reel", "Mini Story", "POV / Realization", "Written Post", "Long-form"],
+    };
+    for (const [mode, legalFormats] of Object.entries(expected) as Array<[ContentMode, ContentFormat[]]>) {
+      expect(getLegalFormats(mode)).toEqual(legalFormats);
+      for (const format of formats) expect(isLegalModeFormat(mode, format)).toBe(legalFormats.includes(format));
+    }
+    expect(() => getFormatGenerationInstructions("Practical", "POV / Realization")).toThrow(
+      "Practical mode cannot use POV / Realization",
+    );
   });
 
   it("offers full drafts only where the format benefits from one", () => {
@@ -42,11 +62,11 @@ describe("format generation contracts", () => {
     expect(fullDraftKind("Written Post")).toBe("written draft");
     expect(fullDraftKind("Long-form")).toBe("written draft");
     expect(fullDraftKind("Yap Reel")).toBe("script");
-    expect(getFullDraftInstructions("Mini Story")).toContain("scene-first");
-    expect(getFullDraftInstructions("POV / Realization")).toContain("brief, complete spoken script");
-    expect(getFullDraftInstructions("POV / Realization")).toContain("do not add a second argument");
-    expect(getFullDraftInstructions("Long-form")).toContain("written piece");
-    expect(getFullDraftInstructions("Long-form")).not.toContain("speakable");
+    expect(getFullDraftInstructions("Reflection", "Mini Story")).toContain("scene-first");
+    expect(getFullDraftInstructions("Dispatch", "POV / Realization")).toContain("brief, complete spoken script");
+    expect(getFullDraftInstructions("Dispatch", "POV / Realization")).toContain("do not add a second argument");
+    expect(getFullDraftInstructions("Reflection", "Long-form")).toContain("written piece");
+    expect(getFullDraftInstructions("Reflection", "Long-form")).not.toContain("speakable");
   });
 
   it("defines format-specific production workflows and honest initial states", () => {

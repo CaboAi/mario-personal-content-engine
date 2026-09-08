@@ -4,6 +4,7 @@ import { CONTENT_PILLARS, contentPackageSchema } from "./content-package-schema"
 const validPackage = {
   title: "Start before you are ready",
   format: "Yap Reel" as const,
+  mode: "Dispatch" as const,
   goal: "Reach" as const,
   pillars: ["Action", "Reinvention"] as const,
   spokenHooks: [
@@ -37,6 +38,11 @@ describe("generated content package validation", () => {
         pillars: ["Starting over by doing the work"],
       }),
     ).toThrow();
+  });
+
+  it("requires a canonical content mode", () => {
+    expect(() => contentPackageSchema.parse({ ...validPackage, mode: "Memoir" })).toThrow();
+    expect(() => contentPackageSchema.parse({ ...validPackage, mode: undefined })).toThrow();
   });
 
   it("rejects more than two pillars", () => {
@@ -98,6 +104,7 @@ describe("generated content package validation", () => {
     expect(contentPackageSchema.parse({
       ...validPackage,
       format: "POV / Realization",
+      mode: "Reflection",
       skeleton: ["One sendable realization", "Simple B-roll direction"],
     }).skeleton).toHaveLength(2);
     expect(() => contentPackageSchema.parse({

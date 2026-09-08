@@ -25,6 +25,7 @@ export const contentPackageSchema = z
       "Written Post",
       "Long-form",
     ]),
+    mode: z.enum(["Dispatch", "Practical", "Reflection"]),
     goal: z.enum(["Reach", "Shares", "Saves", "Follows", "Trust"]),
     pillars: z
       .array(z.enum(CONTENT_PILLARS))

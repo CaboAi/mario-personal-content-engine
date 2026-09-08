@@ -32,6 +32,8 @@ export type ContentFormat =
   | "Written Post"
   | "Long-form";
 
+export type ContentMode = "Dispatch" | "Practical" | "Reflection";
+
 export type Pairing = {
   id: string;
   brandSourceId?: string;
@@ -104,6 +106,7 @@ export type ContentPackage = {
   sourceTitle: string;
   sourceReference?: string;
   format: ContentFormat;
+  mode?: ContentMode;
   goal: "Reach" | "Shares" | "Saves" | "Follows" | "Trust";
   pillars: string[];
   status: ProductionStatus;

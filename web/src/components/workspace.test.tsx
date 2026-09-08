@@ -91,7 +91,8 @@ describe("Production package instructions", () => {
 
     expect(screen.queryByText("Automatic media inspection")).toBeNull();
     expect(screen.getByText("Step 1 · Mario-owned direction")).toBeTruthy();
-    expect(screen.getByText("Step 2 · Output format")).toBeTruthy();
+    expect(screen.getByText("Step 2 · Content mode")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Dispatch/ })).toBeTruthy();
     expect(screen.getByText("Best structural fit")).toBeTruthy();
     expect(screen.getByText("Different Mario lens")).toBeTruthy();
     expect(screen.getByText("Credible wildcard")).toBeTruthy();

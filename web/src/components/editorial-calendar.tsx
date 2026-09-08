@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { getBatchMix } from "@/lib/batch-mix";
 import type { ContentBatch, ContentPackage } from "@/lib/domain";
 
 type Props = {
@@ -33,6 +34,10 @@ export function EditorialCalendar({ batches, content, onReschedule, onOpenProduc
 
   const selected = content.find((item) => item.id === selectedId);
   const activeBatch = batches.find((batch) => batch.id === batchId);
+  const batchPackages = useMemo(() => content
+    .filter((item) => !item.archivedAt)
+    .filter((item) => batchId === "all" || item.batchId === batchId), [batchId, content]);
+  const batchMix = useMemo(() => getBatchMix(batchPackages), [batchPackages]);
   const uniqueGoals = [...new Set(content.map((item) => item.goal))];
   const uniqueStatuses = [...new Set(content.map((item) => item.status))];
 
@@ -44,6 +49,13 @@ export function EditorialCalendar({ batches, content, onReschedule, onOpenProduc
         <p>Planning dates are editorial only. Instagram posting and performance review timing remain tied to the actual post match.</p>
       </div>
       <button type="button" className="secondary-action" onClick={onOpenProduction}>Open Today focus</button>
+    </div>
+
+    <div className="batch-mode-mix" role="status">
+      <strong>{batchMix.legal ? "Mode mix is legal" : "Mode mix exceeds the Reflection ceiling"}</strong>
+      <span>Dispatch {batchMix.actualPercentages.Dispatch.toFixed(0)}% / {batchMix.targetPercentages.Dispatch}% target</span>
+      <span>Practical {batchMix.actualPercentages.Practical.toFixed(0)}% / {batchMix.targetPercentages.Practical}% target</span>
+      <span>Reflection {batchMix.actualPercentages.Reflection.toFixed(0)}% / {batchMix.targetPercentages.Reflection}% target (33% ceiling)</span>
     </div>
 
     <div className="calendar-filters" aria-label="Calendar filters">
@@ -61,7 +73,7 @@ export function EditorialCalendar({ batches, content, onReschedule, onOpenProduc
           <button className="calendar-card-main" type="button" onClick={() => setSelectedId(item.id)}>
             <span className="calendar-date">{prettyDate(item.plannedFor)}</span>
             <strong>{item.title}</strong>
-            <span>{item.format} · {item.goal} · {item.testVariable} test</span>
+            <span>{item.mode ?? "Reflection"} · {item.format} · {item.goal} · {item.testVariable} test</span>
             <div><span className={`status-pill status-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}</span>{item.publicationClearance === false && <span className="calendar-privacy">Needs approval</span>}</div>
           </button>
           <label className="calendar-date-edit"><span>Planned date</span><input aria-label={`Planned date for ${item.title}`} type="date" value={item.plannedFor ?? ""} disabled={update?.saving} onChange={(event) => void onReschedule(item.id, event.target.value || null)} /></label>
@@ -75,6 +87,7 @@ export function EditorialCalendar({ batches, content, onReschedule, onOpenProduc
       <button type="button" className="text-action" onClick={() => setSelectedId(null)}>Close</button>
       <p className="section-label">Selected package</p>
       <h3>{selected.title}</h3>
+      <p><strong>Mode:</strong> {selected.mode ?? "Reflection"}</p>
       <p><strong>Selected hook:</strong> {selected.selectedHook}</p>
       <p><strong>Source:</strong> {selected.sourceReference ?? selected.sourceTitle}</p>
       {selected.privacyNotes && <p className="calendar-detail-note"><strong>Privacy:</strong> {selected.privacyNotes}</p>}

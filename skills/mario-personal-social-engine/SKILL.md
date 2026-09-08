@@ -38,7 +38,8 @@ If the story lacks a concrete moment or contains unverified claims, mark the mis
 
 Determine:
 
-- Mode: Idea, Skeleton, Full Script, Coach, Performance Review, or Batch. Default Skeleton.
+- Workflow mode: Idea, Skeleton, Full Script, Coach, Performance Review, or Batch. Default Skeleton.
+- Content mode: Dispatch, Practical, or Reflection.
 - Format: Yap Reel, Mini Story, POV / Realization, Carousel, Written Post, or Long-form.
 - Primary goal: Reach, Shares, Saves, Follows, or Trust.
 - Primary pillar and optional secondary pillar.
@@ -66,7 +67,7 @@ Select exactly one test variable. Write a falsifiable hypothesis in this form:
 
 Use `None` for a control or when the item is not part of a deliberate comparison. Do not claim a winner from an uncontrolled single post.
 
-## Generate by mode
+## Generate by workflow mode
 
 ### Idea
 
@@ -101,18 +102,25 @@ Compare posts at the same review window when possible. Identify outliers by the 
 
 Keep daily posting as the floor and provide optional secondary inventory for twice-daily posting. Balance formats without forcing quotas. Do not reuse the same story merely to fill inventory.
 
+For any batch of three or more, Reflection may not exceed one-third of the items. Report actual and target shares: Dispatch 60%, Practical 25%, Reflection 15%.
+
 ## Format behavior
 
 Read `references/content-contract.md` for the exact package and format-specific structure.
 
-Core rules:
+Content-mode rules:
 
-- Yap Reel: personal tension or opinion first; usually one developed argument.
-- Mini Story: event, felt experience, change, realization. Do not open with the lesson.
-- POV / Realization: one sendable sentence and simple visual direction.
-- Carousel: visual essay; one idea per slide; each slide should survive as a screenshot.
-- Written Post: complete thought with a personal receipt, not a transcript dump.
-- Long-form: earn the length through story, argument, and development.
+- Dispatch: concrete situation or real number, what Mario did, what actually happened, what he is changing, and what happens next. End on a result or decision that implies the next dispatch.
+- Practical: hook, a plainly stated keepable list, question set, threshold, or rule, how to use it, and the cost of ignoring it. End on the rule, stated flat.
+- Reflection: scene, what Mario believed then, what he did, what changed, and a dated claim. End on a claim, never a feeling or uncertainty.
+
+Legal mode-format pairs:
+
+- Dispatch: Yap Reel, POV / Realization, Carousel, Written Post, Long-form.
+- Practical: Yap Reel, Carousel, Written Post, Long-form.
+- Reflection: Yap Reel, Mini Story, POV / Realization, Written Post, Long-form.
+
+Mini Story is Reflection-only, Carousel is excluded from Reflection, and POV / Realization is excluded from Practical. Video formats target 30-45 seconds.
 
 ## Quality gate
 
@@ -123,6 +131,7 @@ Reject or rewrite content that fails any mandatory check:
 - The post contains one primary idea.
 - The language is direct and speakable.
 - The ending is stronger than a generic CTA.
+- The closing line lands a result, decision, or dated claim—not a principle, realization, takeaway, rhetorical question, or hedge.
 - No story, metric, emotion, result, or biography was invented.
 - A generic self-improvement account could not publish it unchanged.
 - A saved post supplied structure only, never substance.

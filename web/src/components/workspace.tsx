@@ -13,6 +13,7 @@ import { EditorialCalendar } from "@/components/editorial-calendar";
 import type {
   BrandSourceInventory,
   ContentFormat,
+  ContentMode,
   ContentPackage,
   DashboardData,
   InstagramAccountDaily,
@@ -24,7 +25,7 @@ import type {
   SavedPost,
 } from "@/lib/domain";
 import { generatedDemoPackage } from "@/lib/demo-data";
-import { fullDraftKind, initialProductionStatus, productionStatusesFor, supportsFullDraft } from "@/lib/format-contracts";
+import { fullDraftKind, getLegalFormats, initialProductionStatus, productionStatusesFor, supportsFullDraft } from "@/lib/format-contracts";
 import { getExperimentMetricRows } from "@/lib/performance";
 
 type View = "command" | "saves" | "production" | "calendar" | "performance" | "brand";
@@ -51,6 +52,12 @@ const contentFormats: Array<{ id: ContentFormat; label: string; purpose: string 
   { id: "Carousel", label: "Carousel", purpose: "A complete swipeable visual essay with slide copy" },
   { id: "Written Post", label: "Written Post", purpose: "A nuanced text post; optional full written draft later" },
   { id: "Long-form", label: "Long-form", purpose: "A developed written essay with argument, story, and an optional full draft" },
+];
+
+const contentModes: Array<{ id: ContentMode; label: string; purpose: string }> = [
+  { id: "Dispatch", label: "Dispatch", purpose: "What is happening now, what changed, and the next decision" },
+  { id: "Practical", label: "Practical", purpose: "A keepable list, question set, threshold, or rule" },
+  { id: "Reflection", label: "Reflection", purpose: "A past scene that earns a dated claim" },
 ];
 
 function suggestedFormat(contentType?: SavedPost["contentType"]): ContentFormat {
@@ -89,6 +96,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [selectedFormat, setSelectedFormat] = useState<ContentFormat>(
     suggestedFormat(initialData.saves[0]?.contentType),
   );
+  const [selectedMode, setSelectedMode] = useState<ContentMode>("Dispatch");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusUpdates, setStatusUpdates] = useState<
@@ -135,14 +143,14 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
         const response = await fetch("/api/pairings/approve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ save: selectedSave, pairing: selectedPairing, format: selectedFormat }),
+          body: JSON.stringify({ save: selectedSave, pairing: selectedPairing, format: selectedFormat, mode: selectedMode }),
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Generation failed.");
         created = result.content;
       } else {
         await new Promise((resolve) => window.setTimeout(resolve, 900));
-        created = generatedDemoPackage;
+        created = { ...generatedDemoPackage, mode: selectedMode };
       }
 
       setContent((items) => [created, ...items.filter((item) => item.id !== created.id)]);
@@ -430,6 +438,11 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
               setError(null);
             }}
             onApprove={approveAndGenerate}
+            selectedMode={selectedMode}
+            onSelectMode={(mode) => {
+              setSelectedMode(mode);
+              if (!getLegalFormats(mode).includes(selectedFormat)) setSelectedFormat(getLegalFormats(mode)[0]);
+            }}
             selectedFormat={selectedFormat}
             onSelectFormat={setSelectedFormat}
             isGenerating={isGenerating}
@@ -510,7 +523,7 @@ function CommandCenter({
         <p className="section-label">Today’s decision</p>
         <h2>{priority}</h2>
         <p>
-          {todayItem ? `Today focus: ${todayItem.format} · ${todayItem.goal} · ${todayItem.selectedHook}` : "The engine can prepare the structure. The decision that matters is which Mario-owned truth deserves the format."}
+              {todayItem ? `Today focus: ${todayItem.mode ?? "Reflection"} · ${todayItem.format} · ${todayItem.goal} · ${todayItem.selectedHook}` : "The engine can prepare the structure. The decision that matters is which Mario-owned truth deserves the format."}
         </p>
         <div className="command-actions"><button className="primary-action" onClick={todayItem ? onOpenProduction : onOpenSaves} type="button">{todayItem ? "Open Today focus" : "Open review queue"}</button><button className="text-action" onClick={onOpenCalendar} type="button">View editorial calendar</button></div>
       </div>
@@ -582,6 +595,8 @@ function SavesInbox({
   onSelectSave,
   onSelectPairing,
   onApprove,
+  selectedMode,
+  onSelectMode,
   selectedFormat,
   onSelectFormat,
   isGenerating,
@@ -594,6 +609,8 @@ function SavesInbox({
   onSelectSave: (save: SavedPost) => void;
   onSelectPairing: (pairing: Pairing) => void;
   onApprove: () => void;
+  selectedMode: ContentMode;
+  onSelectMode: (mode: ContentMode) => void;
   selectedFormat: ContentFormat;
   onSelectFormat: (format: ContentFormat) => void;
   isGenerating: boolean;
@@ -709,14 +726,37 @@ function SavesInbox({
         )}
 
         {selectedPairing && (
+          <>
           <div className="format-step">
             <div className="pairing-heading">
-              <div><p className="section-label">Step 2 · Output format</p><h3>Choose what the selected source becomes</h3></div>
+              <div><p className="section-label">Step 2 · Content mode</p><h3>Choose the job this piece performs</h3></div>
               <span>The source stays the same</span>
             </div>
-            <p className="format-explainer">This choice controls the deliverable. A saved Reel can become a carousel or written post; only compatible mechanics are adapted.</p>
+            <p className="format-explainer">Dispatches report progress, Practical pieces leave a usable artifact, and Reflections make a dated claim from a past event.</p>
+            <div className="format-picker" role="radiogroup" aria-label="Content mode">
+              {contentModes.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedMode === mode.id}
+                  className={selectedMode === mode.id ? "format-option selected" : "format-option"}
+                  onClick={() => onSelectMode(mode.id)}
+                >
+                  <strong>{mode.label}</strong><span>{mode.purpose}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="format-step">
+            <div className="pairing-heading">
+              <div><p className="section-label">Step 3 · Output format</p><h3>Choose the delivery for this mode</h3></div>
+              <span>Only legal mode-format pairs are available</span>
+            </div>
+            <p className="format-explainer">A saved Reel can become a carousel or written post; only compatible mechanics are adapted.</p>
             <div className="format-picker" role="radiogroup" aria-label="Content format">
-              {contentFormats.map((format) => (
+              {contentFormats.filter((format) => getLegalFormats(selectedMode).includes(format.id)).map((format) => (
                 <button
                   key={format.id}
                   type="button"
@@ -730,12 +770,13 @@ function SavesInbox({
               ))}
             </div>
           </div>
+          </>
         )}
 
         {selectedPairing && (
           <div className="approval-dock">
             <div>
-              <p className="section-label">Ready to build · {selectedFormat}</p>
+              <p className="section-label">Ready to build · {selectedMode} · {selectedFormat}</p>
               <strong>{selectedPairing.title}</strong>
               <span><b>Technique to transfer:</b> {selectedPairing.direction}</span>
               {selectedPairing.sourceUrl && (
@@ -750,7 +791,7 @@ function SavesInbox({
               onClick={onApprove}
               disabled={isGenerating}
             >
-              {isGenerating ? `Building ${selectedFormat}…` : `Generate ${selectedFormat}`}
+              {isGenerating ? `Building ${selectedMode} ${selectedFormat}…` : `Generate ${selectedMode} ${selectedFormat}`}
             </button>
           </div>
         )}
@@ -867,6 +908,7 @@ function ProductionBoard({
           return <article className="production-item" key={item.id}>
             <div className="production-item-heading">
               <div className="production-meta">
+                <span>{item.mode ?? "Reflection"}</span>
                 <span>{item.format}</span>
                 <span>{item.goal}</span>
                 <span>{item.testVariable} test</span>
@@ -1048,7 +1090,7 @@ function ProductionBoard({
               return (
                 <div className="removed-draft" key={item.id}>
                   <div>
-                    <span>{item.format} · {item.status}</span>
+                    <span>{item.mode ?? "Reflection"} · {item.format} · {item.status}</span>
                     <strong>{item.title}</strong>
                     <small>
                       Removed {item.archivedAt ? formatDate(item.archivedAt) : "from Production"}

@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     save: z.object({ id: z.string().uuid() }).passthrough(),
     pairing: z.object({ id: z.string().uuid() }).passthrough(),
     format: z.enum(["Yap Reel", "Mini Story", "POV / Realization", "Carousel", "Written Post", "Long-form"]),
+    mode: z.enum(["Dispatch", "Practical", "Reflection"]),
   });
   const parsed = bodySchema.safeParse(decoded);
   if (!parsed.success) {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const generated = await generateContentPackage(save, pairing, parsed.data.format);
+    const generated = await generateContentPackage(save, pairing, parsed.data.format, parsed.data.mode);
     const created = await supabaseRequest<Array<Record<string, unknown>>>(
       "rpc/promote_pairing",
       {

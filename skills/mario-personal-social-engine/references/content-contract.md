@@ -5,6 +5,7 @@
 ```text
 CONTENT: [working title]
 FORMAT: [format]
+MODE: [Dispatch, Practical, or Reflection]
 PRIMARY PLATFORM: Instagram
 REPURPOSE: [platforms or None]
 PRIMARY GOAL: [one]
@@ -34,53 +35,48 @@ SELECTED ON-SCREEN HOOK: ...
 WHY: [one sentence]
 ```
 
-## Format bodies
+## Content-mode bodies
 
-### Yap Reel
+### Dispatch
 
-- Personal tension, confession, disagreement, or receipt.
-- One developed argument.
-- A broader takeaway after the receipt.
-- Strong closing line.
-- Suggested visual or framing only when Visual is relevant.
+- Hook: the concrete situation or real number.
+- What Mario did.
+- What actually happened.
+- What he is changing.
+- What happens next.
+- End on a result or decision that implies the next dispatch.
 
-### Mini Story
+### Practical
+
+- Hook.
+- State the keepable artifact plainly: a list, question set, threshold, or rule.
+- Show how to use it.
+- Name what it costs to ignore it.
+- End on the rule, stated flat.
+
+### Reflection
 
 - Scene.
-- Felt experience.
-- Choice or turning point.
+- What Mario believed then.
+- What he did.
 - What changed.
-- One realization.
+- A dated claim.
+- End on a claim, never on a feeling or uncertainty.
 
-### POV / Realization
+## Legal mode-format matrix
 
-- One on-screen line.
-- Optional short caption.
-- Simple B-roll direction.
-- No padded script.
+- Dispatch: Yap Reel, POV / Realization, Carousel, Written Post, Long-form.
+- Practical: Yap Reel, Carousel, Written Post, Long-form.
+- Reflection: Yap Reel, Mini Story, POV / Realization, Written Post, Long-form.
 
-### Carousel
+Mini Story is Reflection-only. Carousel is excluded from Reflection. POV / Realization is excluded from Practical.
 
-- Cover hook.
-- One job per slide.
-- Repeating visual spine through the middle.
-- Payoff.
-- Final save/share line that does not weaken the ending.
+## Format delivery
 
-### Written Post
-
-- Opening line with tension.
-- Personal receipt.
-- Developed interpretation.
-- Strong final thought.
-
-### Long-form
-
-- Central question or argument.
-- Story spine.
-- Developed sections.
-- Counterpoint or complication.
-- Resolution that remains honest about what is unfinished.
+- Video formats target 30-45 seconds.
+- Mini Story is a retrospective scene format.
+- Carousel uses a cover hook, one job per slide, and a repeating visual spine.
+- POV / Realization uses concise voiceover or direct-to-camera copy with simple B-roll direction.
 
 ## Closing block
 

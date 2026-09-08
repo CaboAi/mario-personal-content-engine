@@ -393,6 +393,9 @@ a { color: inherit; }
 .format-option.selected { border-color: var(--accent); background: var(--white); box-shadow: inset 0 -3px 0 var(--accent); }
 .format-option strong { font-size: .72rem; }
 .format-option span { color: var(--muted); font-size: .6rem; line-height: 1.35; }
+.batch-mode-mix { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: 1rem 0; padding: .8rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: .65rem; }
+.batch-mode-mix strong { color: var(--accent-dark); }
+.batch-mode-mix span { color: var(--muted); }
 
 .production-layout, .performance-layout, .brand-layout { padding-top: 2rem; }
 .calendar-layout { padding-top: 2rem; }
