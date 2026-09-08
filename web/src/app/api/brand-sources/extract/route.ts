@@ -57,8 +57,15 @@ export async function POST(request: Request) {
     });
     if (!response.ok) throw new Error(`OpenAI extraction failed (${response.status}).`);
     const proposal = brandSourceExtractionSchema.parse(parseStructuredJson(await response.json()));
-    assertExtractionGrounded(parsed.data.rawText, proposal);
-    return NextResponse.json({ proposal: normalizeExtractedSource(proposal) });
+    const grounding = assertExtractionGrounded(parsed.data.rawText, proposal);
+    const normalized = normalizeExtractedSource(proposal);
+    return NextResponse.json({
+      proposal: normalized,
+      approximateFields: grounding.approximateFields.filter((field) => {
+        const value = normalized[field as keyof typeof normalized];
+        return Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0;
+      }),
+    });
   } catch (cause) {
     return NextResponse.json({
       error: cause instanceof Error ? cause.message : "Source extraction failed.",

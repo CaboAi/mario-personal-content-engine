@@ -44,7 +44,36 @@ describe("brand source extraction safeguards", () => {
       fieldEvidence: { ...proposal().fieldEvidence, storyEvidence: "doubled revenue" },
     });
 
-    expect(() => assertExtractionGrounded("A project changed.", extracted)).toThrow(/storyEvidence lacks an exact supporting excerpt/);
+    expect(() => assertExtractionGrounded("A project changed.", extracted)).toThrow(/storyEvidence lacks a supporting excerpt/);
+  });
+
+  it("accepts evidence after normalizing capitalization, punctuation, and spacing", () => {
+    const extracted = proposal({
+      storyEvidence: "Mario became CTO at Skool Scale",
+      fieldEvidence: { ...proposal().fieldEvidence, storyEvidence: "MARIO   became, CTO at Skool Scale!" },
+    });
+
+    expect(assertExtractionGrounded("mario became CTO at skool scale", extracted).approximateFields).toEqual([]);
+  });
+
+  it("accepts a corrected typo through ordered token overlap and flags it approximate", () => {
+    const extracted = proposal({
+      storyEvidence: "Mario became CTO at Skool Scale",
+      fieldEvidence: { ...proposal().fieldEvidence, storyEvidence: "Mario became CTO at Skool Scale" },
+    });
+
+    expect(assertExtractionGrounded("Mario becme CTO at Skool Scale", extracted).approximateFields).toEqual(["storyEvidence"]);
+  });
+
+  it("hard-fails a claimed person, number, or outcome absent from the raw capture", () => {
+    const extracted = proposal({
+      storyEvidence: "Ava paid 300 dollars after the launch",
+      fieldEvidence: { ...proposal().fieldEvidence, storyEvidence: "Ava paid 300 dollars after the launch" },
+    });
+
+    expect(() => assertExtractionGrounded("Mario worked on the launch.", extracted)).toThrow(
+      'Claimed excerpt: "Ava paid 300 dollars after the launch"',
+    );
   });
 
   it("downgrades an older Dispatch classification to Story", () => {

@@ -438,7 +438,7 @@ describe("Live brand source inventory", () => {
       dispatchWhatHappened: "The event.", dispatchSpecificDetail: "The detail.",
       dispatchDecision: "The decision.", dispatchOccurredOn: "2026-09-08", dispatchNextImplication: "The next one.", missingFields: [],
       fieldEvidence: { title: "The raw source.", coreTruth: "The raw source.", pillars: "The raw source." },
-    } }), { status: 200, headers: { "Content-Type": "application/json" } })));
+    }, approximateFields: ["storyEvidence"] }), { status: 200, headers: { "Content-Type": "application/json" } })));
     fireEvent.change(screen.getByLabelText("Raw source"), { target: { value: "The raw source." } });
     fireEvent.click(screen.getByRole("button", { name: "Extract" }));
 
@@ -450,20 +450,21 @@ describe("Live brand source inventory", () => {
     expect(screen.getByLabelText("What it means for the next one")).toBeTruthy();
     expect((screen.getByLabelText("Privacy status") as HTMLSelectElement).value).toBe("Clear");
     expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe("Verified");
+    expect(screen.getByText("Excerpt approximate — confirm this is what you meant.")).toBeTruthy();
   });
 
   it("keeps the raw capture visible when strict factual extraction fails", async () => {
     render(<Workspace initialData={demoData} />);
     fireEvent.click(screen.getByRole("button", { name: "Capture" }));
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      error: "Extraction was stopped because storyEvidence lacks an exact supporting excerpt from the raw capture.",
+      error: "Extraction was stopped because storyEvidence lacks a supporting excerpt from the raw capture. Claimed excerpt: \"made up result\".",
     }), { status: 422, headers: { "Content-Type": "application/json" } })));
 
     const rawCapture = screen.getByLabelText("Raw source") as HTMLTextAreaElement;
     fireEvent.change(rawCapture, { target: { value: "The event that needs a clearer detail." } });
     fireEvent.click(screen.getByRole("button", { name: "Extract" }));
 
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/storyEvidence lacks an exact supporting excerpt/));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/Claimed excerpt: "made up result"/));
     expect(rawCapture.value).toBe("The event that needs a clearer detail.");
   });
 

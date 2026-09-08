@@ -1617,6 +1617,7 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
   const [classificationReason, setClassificationReason] = useState("");
   const [derivedEvidence, setDerivedEvidence] = useState<DerivedFieldEvidence>({ title: "", coreTruth: "", pillars: "" });
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [approximateFields, setApproximateFields] = useState<string[]>([]);
   const [reviewing, setReviewing] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -1662,6 +1663,7 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
       setClassificationReason(proposal.classificationReason);
       setDerivedEvidence(proposal.fieldEvidence);
       setMissingFields(proposal.missingFields);
+      setApproximateFields(Array.isArray(result.approximateFields) ? result.approximateFields : []);
       setValues({
         ...emptySourceCaptureValues(), title: proposal.title, coreTruth: proposal.coreTruth,
         storyEvidence: proposal.storyEvidence, pillars: proposal.pillars,
@@ -1692,7 +1694,7 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
         throw new Error(result.error ?? "The source could not be captured.");
       }
       onSourceCreated(result.source as BrandSourceInventory);
-      setRawText(""); setOptionalOccurredOn(""); setClassificationReason(""); setDerivedEvidence({ title: "", coreTruth: "", pillars: "" }); setMissingFields([]); setReviewing(false);
+      setRawText(""); setOptionalOccurredOn(""); setClassificationReason(""); setDerivedEvidence({ title: "", coreTruth: "", pillars: "" }); setMissingFields([]); setApproximateFields([]); setReviewing(false);
       setValues(emptySourceCaptureValues());
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "The source could not be captured.");
@@ -1723,13 +1725,13 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
         <p className="capture-routing">Dispatch is for the last 30 days and feeds Dispatch posts; Story and Daily Entry are for older material and feed Reflection and Practical.</p>
         <SourceField label="Title — proposed interpretation" field="title" value={values.title} error={fieldErrors.title} onChange={update} helper={`Confirm or rewrite. Drawn from: ${derivedEvidence.title || "no context returned"}`} />
         <SourceField label="Core truth — proposed interpretation" field="coreTruth" value={values.coreTruth} error={fieldErrors.coreTruth} onChange={update} multiline helper={`Confirm or rewrite. Drawn from: ${derivedEvidence.coreTruth || "no context returned"}`} />
-        <SourceField label="Story or evidence" field="storyEvidence" value={values.storyEvidence} error={fieldErrors.storyEvidence} onChange={update} multiline />
+        <SourceField label="Story or evidence" field="storyEvidence" value={values.storyEvidence} error={fieldErrors.storyEvidence} onChange={update} multiline helper={approximateFields.includes("storyEvidence") ? "Excerpt approximate — confirm this is what you meant." : undefined} />
         {sourceType === "Dispatch" && <div className="dispatch-fields">
-          <SourceField label="What happened" field="dispatchWhatHappened" value={values.dispatchWhatHappened} error={fieldErrors.dispatchWhatHappened} onChange={update} multiline />
-          <SourceField label="The number or specific detail" field="dispatchSpecificDetail" value={values.dispatchSpecificDetail} error={fieldErrors.dispatchSpecificDetail} onChange={update} />
-          <SourceField label="The decision you made or are making" field="dispatchDecision" value={values.dispatchDecision} error={fieldErrors.dispatchDecision} onChange={update} multiline />
-          <SourceField label="When it happened (date)" field="dispatchOccurredOn" value={values.dispatchOccurredOn} error={fieldErrors.dispatchOccurredOn} onChange={update} type="date" />
-          <SourceField label="What it means for the next one" field="dispatchNextImplication" value={values.dispatchNextImplication} error={fieldErrors.dispatchNextImplication} onChange={update} multiline />
+          <SourceField label="What happened" field="dispatchWhatHappened" value={values.dispatchWhatHappened} error={fieldErrors.dispatchWhatHappened} onChange={update} multiline helper={approximateFields.includes("dispatchWhatHappened") ? "Excerpt approximate — confirm this is what you meant." : undefined} />
+          <SourceField label="The number or specific detail" field="dispatchSpecificDetail" value={values.dispatchSpecificDetail} error={fieldErrors.dispatchSpecificDetail} onChange={update} helper={approximateFields.includes("dispatchSpecificDetail") ? "Excerpt approximate — confirm this is what you meant." : undefined} />
+          <SourceField label="The decision you made or are making" field="dispatchDecision" value={values.dispatchDecision} error={fieldErrors.dispatchDecision} onChange={update} multiline helper={approximateFields.includes("dispatchDecision") ? "Excerpt approximate — confirm this is what you meant." : undefined} />
+          <SourceField label="When it happened (date)" field="dispatchOccurredOn" value={values.dispatchOccurredOn} error={fieldErrors.dispatchOccurredOn} onChange={update} type="date" helper={approximateFields.includes("dispatchOccurredOn") ? "Excerpt approximate — confirm this is what you meant." : undefined} />
+          <SourceField label="What it means for the next one" field="dispatchNextImplication" value={values.dispatchNextImplication} error={fieldErrors.dispatchNextImplication} onChange={update} multiline helper={approximateFields.includes("dispatchNextImplication") ? "Excerpt approximate — confirm this is what you meant." : undefined} />
         </div>}
         <fieldset className="source-pillars"><legend>Pillars — proposed interpretation</legend><p>Confirm or rewrite. Drawn from: {derivedEvidence.pillars || "no context returned"}</p>{sourcePillars.map((pillar) => <label key={pillar}><input type="checkbox" checked={values.pillars.includes(pillar)} onChange={() => togglePillar(pillar)} /><span>{pillar}</span></label>)}</fieldset>
         {fieldErrors.pillars && <small className="inline-error">{fieldErrors.pillars}</small>}
