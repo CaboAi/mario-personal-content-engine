@@ -1598,6 +1598,8 @@ type CaptureValues = {
   dispatchNextImplication: string;
 };
 
+type DerivedFieldEvidence = { title: string; coreTruth: string; pillars: string };
+
 function emptySourceCaptureValues(): CaptureValues {
   return {
     title: "", coreTruth: "", storyEvidence: "", pillars: [],
@@ -1613,6 +1615,7 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
   const [sourceType, setSourceType] = useState<CaptureSourceType>("Story");
   const [values, setValues] = useState<CaptureValues>(emptySourceCaptureValues);
   const [classificationReason, setClassificationReason] = useState("");
+  const [derivedEvidence, setDerivedEvidence] = useState<DerivedFieldEvidence>({ title: "", coreTruth: "", pillars: "" });
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [reviewing, setReviewing] = useState(false);
   const [extracting, setExtracting] = useState(false);
@@ -1653,9 +1656,11 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
         coreTruth: string; storyEvidence: string; pillars: string[];
         dispatchWhatHappened: string; dispatchSpecificDetail: string; dispatchDecision: string;
         dispatchOccurredOn: string; dispatchNextImplication: string; missingFields: string[];
+        fieldEvidence: DerivedFieldEvidence;
       };
       setSourceType(proposal.sourceType);
       setClassificationReason(proposal.classificationReason);
+      setDerivedEvidence(proposal.fieldEvidence);
       setMissingFields(proposal.missingFields);
       setValues({
         ...emptySourceCaptureValues(), title: proposal.title, coreTruth: proposal.coreTruth,
@@ -1687,7 +1692,7 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
         throw new Error(result.error ?? "The source could not be captured.");
       }
       onSourceCreated(result.source as BrandSourceInventory);
-      setRawText(""); setOptionalOccurredOn(""); setClassificationReason(""); setMissingFields([]); setReviewing(false);
+      setRawText(""); setOptionalOccurredOn(""); setClassificationReason(""); setDerivedEvidence({ title: "", coreTruth: "", pillars: "" }); setMissingFields([]); setReviewing(false);
       setValues(emptySourceCaptureValues());
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "The source could not be captured.");
@@ -1716,8 +1721,8 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
         <label><span>Why this classification</span><input aria-label="Why this classification" value={classificationReason} onChange={(event) => setClassificationReason(event.target.value)} /></label>
         {missingFields.length > 0 && <p className="inline-error">Needs your input: {missingFields.join(", ")}.</p>}
         <p className="capture-routing">Dispatch is for the last 30 days and feeds Dispatch posts; Story and Daily Entry are for older material and feed Reflection and Practical.</p>
-        <SourceField label="Title" field="title" value={values.title} error={fieldErrors.title} onChange={update} />
-        <SourceField label="Core truth" field="coreTruth" value={values.coreTruth} error={fieldErrors.coreTruth} onChange={update} multiline />
+        <SourceField label="Title — proposed interpretation" field="title" value={values.title} error={fieldErrors.title} onChange={update} helper={`Confirm or rewrite. Drawn from: ${derivedEvidence.title || "no context returned"}`} />
+        <SourceField label="Core truth — proposed interpretation" field="coreTruth" value={values.coreTruth} error={fieldErrors.coreTruth} onChange={update} multiline helper={`Confirm or rewrite. Drawn from: ${derivedEvidence.coreTruth || "no context returned"}`} />
         <SourceField label="Story or evidence" field="storyEvidence" value={values.storyEvidence} error={fieldErrors.storyEvidence} onChange={update} multiline />
         {sourceType === "Dispatch" && <div className="dispatch-fields">
           <SourceField label="What happened" field="dispatchWhatHappened" value={values.dispatchWhatHappened} error={fieldErrors.dispatchWhatHappened} onChange={update} multiline />
@@ -1726,7 +1731,7 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
           <SourceField label="When it happened (date)" field="dispatchOccurredOn" value={values.dispatchOccurredOn} error={fieldErrors.dispatchOccurredOn} onChange={update} type="date" />
           <SourceField label="What it means for the next one" field="dispatchNextImplication" value={values.dispatchNextImplication} error={fieldErrors.dispatchNextImplication} onChange={update} multiline />
         </div>}
-        <fieldset className="source-pillars"><legend>Pillars</legend>{sourcePillars.map((pillar) => <label key={pillar}><input type="checkbox" checked={values.pillars.includes(pillar)} onChange={() => togglePillar(pillar)} /><span>{pillar}</span></label>)}</fieldset>
+        <fieldset className="source-pillars"><legend>Pillars — proposed interpretation</legend><p>Confirm or rewrite. Drawn from: {derivedEvidence.pillars || "no context returned"}</p>{sourcePillars.map((pillar) => <label key={pillar}><input type="checkbox" checked={values.pillars.includes(pillar)} onChange={() => togglePillar(pillar)} /><span>{pillar}</span></label>)}</fieldset>
         {fieldErrors.pillars && <small className="inline-error">{fieldErrors.pillars}</small>}
         <label><span>Privacy status</span><select aria-label="Privacy status" value={values.privacyStatus} onChange={(event) => update("privacyStatus", event.target.value)}><option value="Needs confirmation">Needs confirmation</option><option value="Clear">Clear</option></select></label>
         <label><span>Status</span><select aria-label="Status" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="Captured">Captured</option><option value="Verified">Verified</option><option value="Used">Used</option></select></label>
@@ -1739,16 +1744,17 @@ function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourc
 }
 
 function SourceField({
-  label, field, value, error, onChange, multiline = false, type = "text",
+  label, field, value, error, onChange, helper, multiline = false, type = "text",
 }: {
   label: string; field: keyof CaptureValues; value: string; error?: string;
   onChange: (field: keyof CaptureValues, value: string | string[]) => void;
+  helper?: string;
   multiline?: boolean; type?: "text" | "date";
 }) {
   const input = multiline
     ? <textarea aria-label={label} rows={3} value={value} onChange={(event) => onChange(field, event.target.value)} />
     : <input aria-label={label} type={type} value={value} onChange={(event) => onChange(field, event.target.value)} />;
-  return <label className={error ? "field-error" : ""}><span>{label}</span>{input}{error && <small className="inline-error">{error}</small>}</label>;
+  return <label className={error ? "field-error" : ""}><span>{label}</span>{input}{helper && <small className="field-helper">{helper}</small>}{error && <small className="inline-error">{error}</small>}</label>;
 }
 
 function EmptyState({ title, body }: { title: string; body: string }) {

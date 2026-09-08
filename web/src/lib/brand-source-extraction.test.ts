@@ -29,13 +29,22 @@ function proposal(overrides: Partial<BrandSourceExtraction> = {}): BrandSourceEx
 }
 
 describe("brand source extraction safeguards", () => {
-  it("rejects an extracted fact without an exact raw-text receipt", () => {
+  it("allows a derived core truth when the events are present but the lesson is not stated", () => {
     const extracted = proposal({
-      coreTruth: "A client doubled revenue",
-      fieldEvidence: { ...proposal().fieldEvidence, coreTruth: "doubled revenue" },
+      coreTruth: "The right role followed the work, not the title.",
+      fieldEvidence: { ...proposal().fieldEvidence, coreTruth: "The project changed" },
     });
 
-    expect(() => assertExtractionGrounded("A project changed.", extracted)).toThrow(/coreTruth lacks an exact supporting excerpt/);
+    expect(() => assertExtractionGrounded("A project changed.", extracted)).not.toThrow();
+  });
+
+  it("rejects fabricated factual story evidence without an exact raw-text receipt", () => {
+    const extracted = proposal({
+      storyEvidence: "A client doubled revenue",
+      fieldEvidence: { ...proposal().fieldEvidence, storyEvidence: "doubled revenue" },
+    });
+
+    expect(() => assertExtractionGrounded("A project changed.", extracted)).toThrow(/storyEvidence lacks an exact supporting excerpt/);
   });
 
   it("downgrades an older Dispatch classification to Story", () => {
