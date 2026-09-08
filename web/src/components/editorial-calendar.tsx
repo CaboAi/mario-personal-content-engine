@@ -52,10 +52,11 @@ export function EditorialCalendar({ batches, content, onReschedule, onOpenProduc
     </div>
 
     <div className="batch-mode-mix" role="status">
-      <strong>{batchMix.legal ? "Mode mix is legal" : "Mode mix exceeds the Reflection ceiling"}</strong>
+      <strong>{batchMix.legal ? "Mode mix is legal" : "Mode mix is not legal"}</strong>
       <span>Dispatch {batchMix.actualPercentages.Dispatch.toFixed(0)}% / {batchMix.targetPercentages.Dispatch}% target</span>
       <span>Practical {batchMix.actualPercentages.Practical.toFixed(0)}% / {batchMix.targetPercentages.Practical}% target</span>
       <span>Reflection {batchMix.actualPercentages.Reflection.toFixed(0)}% / {batchMix.targetPercentages.Reflection}% target (33% ceiling)</span>
+      {batchMix.violations.map((violation) => <span key={`${violation.mode}-${violation.rule}`}>{violation.message}</span>)}
     </div>
 
     <div className="calendar-filters" aria-label="Calendar filters">
