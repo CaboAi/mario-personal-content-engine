@@ -40,11 +40,12 @@ select
   bs.id::text as "id", bs.source_type as "sourceType", bs.title as "title",
   bs.core_truth as "coreTruth", bs.story_evidence as "storyEvidence",
   bs.privacy_status as "privacyStatus", bs.pillars as "pillars", bs.source_url as "sourceUrl",
-  bs.status as "status", bs.retired as "retired", bs.dispatch_what_happened as "dispatchWhatHappened",
+  bs.status as "status", bs.updated_at as "updatedAt", count(ci.id)::integer as "usageCount",
+  bs.source_external_id as "sourceExternalId", bs.created_at as "createdAt",
+  bs.retired as "retired", bs.dispatch_what_happened as "dispatchWhatHappened",
   bs.dispatch_specific_detail as "dispatchSpecificDetail", bs.dispatch_decision as "dispatchDecision",
   bs.dispatch_occurred_on as "dispatchOccurredOn", bs.dispatch_next_implication as "dispatchNextImplication",
-  bs.dispatch_freshness_days as "dispatchFreshnessDays", bs.updated_at as "updatedAt",
-  count(ci.id)::integer as "usageCount", bs.source_external_id as "sourceExternalId", bs.created_at as "createdAt"
+  bs.dispatch_freshness_days as "dispatchFreshnessDays"
 from public.brand_sources bs
 left join public.content_items ci on ci.brand_source_id = bs.id
 group by bs.id;
