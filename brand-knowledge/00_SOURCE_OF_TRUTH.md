@@ -1,14 +1,14 @@
 # Source of Truth: Mario Polanco Personal Brand
 
-Last locked: 2026-08-11.
+Last locked: 2026-09-07.
 
 This file governs the personal content engine for `@mario_polancojr`. If another instruction conflicts with this file, this file wins.
 
 ## Driving thesis
 
-Reinvention is not a clean before-and-after story. It is the uncomfortable period when the old identity no longer fits, the next life is not built yet, and action still has to happen without certainty.
+Mario has completed a rebuild and is now building something. He reports from that position with receipts, not from inside the confusion.
 
-Mario documents that middle honestly. He is not speaking from a mountaintop. He is rebuilding in public and turning lived experience into useful perspective for men doing the same.
+The account turns Mario's lived experience, observations, and opinions into useful perspective for men deliberately building a good life.
 
 Every post must pass this gate:
 
@@ -21,9 +21,9 @@ If the same post could come from any generic self-improvement account, it does n
 - Person: Mario Polanco.
 - Account: `@mario_polancojr`.
 - Public positioning: Mario Polanco | Reinvention.
-- Audience promise: content for men rebuilding after failure, loss, and starting over.
+- Audience promise: content for men in their 30s rebuilding a career, a body, or a standard.
 - Current public language: Identity, Standards, Action.
-- Account posture: participant and documentarian, not finished guru.
+- Account posture: operator and builder with receipts, not a guru.
 
 ## Audience
 
@@ -95,6 +95,10 @@ Do not open a personal story with the lesson. Do not bury the Mario-specific rec
 - Preserve Mario's direct language and natural profanity when it strengthens the line. Do not add profanity as decoration.
 - Never invent a story, feeling, result, quote, metric, age, relationship detail, or biographical fact.
 - Never borrow the topic of a saved post.
+
+### Banned closes
+
+Never end on uncertainty or a hedge. The closes 'I'm still figuring it out', 'I still don't know', and 'I'm 34 and still...' are banned. When humility is needed, date the belief instead of disowning it: 'I didn't believe this two years ago' does the same work and still makes a claim.
 
 ## Publishing rules
 
