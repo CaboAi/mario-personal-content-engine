@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import {
   BookmarkSimple,
   CalendarBlank,
@@ -89,6 +89,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [view, setView] = useState<View>("command");
   const [saves, setSaves] = useState(initialData.saves);
   const [content, setContent] = useState(initialData.content);
+  const [sources, setSources] = useState(initialData.sources);
   const [selectedSaveId, setSelectedSaveId] = useState(initialData.saves[0]?.id);
   const [selectedPairingId, setSelectedPairingId] = useState<string | undefined>(
     initialData.saves[0]?.pairings.find((pairing) => pairing.recommended)?.id,
@@ -126,7 +127,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const inventoryCount = content.filter(
     (item) => !item.archivedAt && item.status !== "Posted",
   ).length;
-  const usableSourceCount = initialData.sources.filter((source) => isSourceAvailableForPairing(source)).length;
+  const usableSourceCount = sources.filter((source) => isSourceAvailableForPairing(source)).length;
 
   async function approveAndGenerate() {
     if (!selectedSave || !selectedPairing) return;
@@ -487,7 +488,9 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
           />
         )}
 
-        {view === "brand" && <BrandSystem sources={initialData.sources} />}
+        {view === "brand" && <BrandSystem sources={sources} onSourceCreated={(source) => {
+          setSources((items) => [source, ...items.filter((item) => item.id !== source.id)]);
+        }} />}
       </main>
     </div>
   );
@@ -1509,7 +1512,13 @@ function PatternSignal({ label, item, metric }: { label: string; item?: Instagra
   return <article className="pattern-signal"><p className="section-label">{label}</p>{item ? <><strong>{mediaLabel(item)}</strong><span>{(item[metric] ?? 0).toLocaleString()} {metric}</span><small>Current historical leader. Treat as an observation until a comparable post repeats the result.</small></> : <span>No imported evidence yet.</span>}</article>;
 }
 
-function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
+function BrandSystem({
+  sources,
+  onSourceCreated,
+}: {
+  sources: BrandSourceInventory[];
+  onSourceCreated: (source: BrandSourceInventory) => void;
+}) {
   const pillars = [
     "Reinvention",
     "Identity",
@@ -1535,10 +1544,9 @@ function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
     <section className="brand-layout stagger-in">
       <div className="brand-thesis">
         <p className="section-label">Driving thesis</p>
-        <h2>Reinvention is the middle, not the before-and-after.</h2>
+        <h2>Mario has completed a rebuild and is now building something.</h2>
         <p>
-          Mario documents the period when the old identity no longer fits, the next life is not
-          built yet, and action still has to happen without certainty.
+          He reports from that position with receipts, not from inside the confusion. The account turns Mario&apos;s lived experience, observations, and opinions into useful perspective for men deliberately building a good life.
         </p>
       </div>
       <div className="pillar-list">
@@ -1577,8 +1585,112 @@ function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
           </article>
         ))}
       </div>
+      <SourceCaptureForm onSourceCreated={onSourceCreated} />
     </section>
   );
+}
+
+const sourcePillars = [
+  "Reinvention", "Identity", "Standards", "Action", "Responsibility", "Self-Respect", "Perspective", "Life Story",
+] as const;
+
+type CaptureSourceType = "Story" | "Daily Entry" | "Dispatch";
+type CaptureValues = {
+  title: string; coreTruth: string; storyEvidence: string; pillars: string[];
+  privacyStatus: string; status: string; dispatchWhatHappened: string;
+  dispatchSpecificDetail: string; dispatchDecision: string; dispatchOccurredOn: string;
+  dispatchNextImplication: string;
+};
+
+function emptySourceCaptureValues(): CaptureValues {
+  return {
+    title: "", coreTruth: "", storyEvidence: "", pillars: [],
+    privacyStatus: "Needs confirmation", status: "Captured",
+    dispatchWhatHappened: "", dispatchSpecificDetail: "", dispatchDecision: "",
+    dispatchOccurredOn: "", dispatchNextImplication: "",
+  };
+}
+
+function SourceCaptureForm({ onSourceCreated }: { onSourceCreated: (source: BrandSourceInventory) => void }) {
+  const [sourceType, setSourceType] = useState<CaptureSourceType>("Story");
+  const [values, setValues] = useState<CaptureValues>(emptySourceCaptureValues);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  function update(field: keyof CaptureValues, value: string | string[]) {
+    setValues((current) => ({ ...current, [field]: value }));
+    setFieldErrors((errors) => {
+      const remaining = { ...errors };
+      delete remaining[field];
+      return remaining;
+    });
+  }
+
+  function togglePillar(pillar: string) {
+    update("pillars", values.pillars.includes(pillar)
+      ? values.pillars.filter((item) => item !== pillar)
+      : [...values.pillars, pillar]);
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true); setSubmissionError(null); setFieldErrors({});
+    try {
+      const response = await fetch("/api/brand-sources", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceType, ...values }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setFieldErrors(result.fieldErrors ?? {});
+        throw new Error(result.error ?? "The source could not be captured.");
+      }
+      onSourceCreated(result.source as BrandSourceInventory);
+      setValues(emptySourceCaptureValues());
+    } catch (cause) {
+      setSubmissionError(cause instanceof Error ? cause.message : "The source could not be captured.");
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <form className="source-capture edits-form" onSubmit={(event) => void submit(event)} noValidate>
+      <div className="panel-heading"><div><p className="section-label">Capture a source</p><h3>Add Mario-owned material</h3></div></div>
+      <label><span>Source type</span><select aria-label="Source type" value={sourceType} onChange={(event) => setSourceType(event.target.value as CaptureSourceType)}>
+        <option value="Story">Story</option><option value="Daily Entry">Daily Entry</option><option value="Dispatch">Dispatch</option>
+      </select></label>
+      <p>Dispatch is for the last 30 days and feeds Dispatch posts; Story and Daily Entry are for older material and feed Reflection and Practical.</p>
+      <SourceField label="Title" field="title" value={values.title} error={fieldErrors.title} onChange={update} />
+      <SourceField label="Core truth" field="coreTruth" value={values.coreTruth} error={fieldErrors.coreTruth} onChange={update} multiline />
+      <SourceField label="Story or evidence" field="storyEvidence" value={values.storyEvidence} error={fieldErrors.storyEvidence} onChange={update} multiline />
+      {sourceType === "Dispatch" && <div className="dispatch-fields">
+        <SourceField label="What happened" field="dispatchWhatHappened" value={values.dispatchWhatHappened} error={fieldErrors.dispatchWhatHappened} onChange={update} multiline />
+        <SourceField label="The number or specific detail" field="dispatchSpecificDetail" value={values.dispatchSpecificDetail} error={fieldErrors.dispatchSpecificDetail} onChange={update} />
+        <SourceField label="The decision you made or are making" field="dispatchDecision" value={values.dispatchDecision} error={fieldErrors.dispatchDecision} onChange={update} multiline />
+        <SourceField label="When it happened (date)" field="dispatchOccurredOn" value={values.dispatchOccurredOn} error={fieldErrors.dispatchOccurredOn} onChange={update} type="date" />
+        <SourceField label="What it means for the next one" field="dispatchNextImplication" value={values.dispatchNextImplication} error={fieldErrors.dispatchNextImplication} onChange={update} multiline />
+      </div>}
+      <fieldset className="source-pillars"><legend>Pillars</legend>{sourcePillars.map((pillar) => <label key={pillar}><input type="checkbox" checked={values.pillars.includes(pillar)} onChange={() => togglePillar(pillar)} />{pillar}</label>)}</fieldset>
+      {fieldErrors.pillars && <small className="inline-error">{fieldErrors.pillars}</small>}
+      <label><span>Privacy status</span><select value={values.privacyStatus} onChange={(event) => update("privacyStatus", event.target.value)}><option value="Needs confirmation">Needs confirmation</option><option value="Clear">Clear</option></select></label>
+      <label><span>Status</span><select value={values.status} onChange={(event) => update("status", event.target.value)}><option value="Captured">Captured</option><option value="Verified">Verified</option><option value="Used">Used</option></select></label>
+      <button className="primary-action" type="submit" disabled={saving}>{saving ? "Capturing…" : "Capture source"}</button>
+      {submissionError && <p className="inline-error" role="alert">{submissionError}</p>}
+    </form>
+  );
+}
+
+function SourceField({
+  label, field, value, error, onChange, multiline = false, type = "text",
+}: {
+  label: string; field: keyof CaptureValues; value: string; error?: string;
+  onChange: (field: keyof CaptureValues, value: string | string[]) => void;
+  multiline?: boolean; type?: "text" | "date";
+}) {
+  const input = multiline
+    ? <textarea aria-label={label} rows={3} value={value} onChange={(event) => onChange(field, event.target.value)} />
+    : <input aria-label={label} type={type} value={value} onChange={(event) => onChange(field, event.target.value)} />;
+  return <label className={error ? "field-error" : ""}><span>{label}</span>{input}{error && <small className="inline-error">{error}</small>}</label>;
 }
 
 function EmptyState({ title, body }: { title: string; body: string }) {

@@ -426,6 +426,20 @@ describe("Production package instructions", () => {
 });
 
 describe("Live brand source inventory", () => {
+  it("shows Dispatch-only fields only after Dispatch is selected", () => {
+    render(<Workspace initialData={demoData} />);
+    fireEvent.click(screen.getByRole("button", { name: /Brand System/ }));
+
+    expect(screen.getByText("Capture a source")).toBeTruthy();
+    expect(screen.queryByLabelText("What happened")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Source type"), { target: { value: "Dispatch" } });
+    expect(screen.getByLabelText("What happened")).toBeTruthy();
+    expect(screen.getByLabelText("The number or specific detail")).toBeTruthy();
+    expect(screen.getByLabelText("The decision you made or are making")).toBeTruthy();
+    expect(screen.getByLabelText("When it happened (date)")).toBeTruthy();
+    expect(screen.getByLabelText("What it means for the next one")).toBeTruthy();
+  });
+
   it("names the required intake when the recorded inventory has no usable source", () => {
     render(
       <Workspace initialData={{
