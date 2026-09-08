@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { rejectCrossOrigin, requireDashboardSession } from "@/lib/api-auth";
-import type { ContentPackage, SavedPost } from "@/lib/domain";
+import type { BrandSource, ContentPackage, SavedPost } from "@/lib/domain";
 import { fullDraftKind, supportsFullDraft } from "@/lib/format-contracts";
 import { generateFullScript } from "@/lib/openai";
 import { isLiveMode, supabaseRequest } from "@/lib/supabase-rest";
@@ -17,11 +17,22 @@ type ContentReference = {
 };
 
 type SourceRow = {
+  id: string;
+  source_type: BrandSource["sourceType"];
   title: string;
   core_truth: string;
   story_evidence: string;
   privacy_status: "Clear" | "Needs confirmation";
   status: string;
+  pillars: string[];
+  source_url?: string;
+  retired: boolean;
+  dispatch_what_happened?: string;
+  dispatch_specific_detail?: string;
+  dispatch_decision?: string;
+  dispatch_occurred_on?: string;
+  dispatch_next_implication?: string;
+  dispatch_freshness_days?: number;
 };
 
 export async function POST(
@@ -82,7 +93,7 @@ export async function POST(
 
     const [sources, saves] = await Promise.all([
       supabaseRequest<SourceRow[]>(
-        `brand_sources?id=eq.${encodeURIComponent(reference.brand_source_id)}&select=title,core_truth,story_evidence,privacy_status,status`,
+        `brand_sources?id=eq.${encodeURIComponent(reference.brand_source_id)}&select=*`,
       ),
       supabaseRequest<SavedPost[]>(
         `dashboard_saved_posts?id=eq.${encodeURIComponent(reference.saved_post_id)}&select=*`,
@@ -98,11 +109,12 @@ export async function POST(
     }
 
     const generated = await generateFullScript(content, save, {
-      title: source.title,
-      coreTruth: source.core_truth,
-      storyEvidence: source.story_evidence,
-      privacyStatus: source.privacy_status,
-      status: source.status,
+      id: source.id, sourceType: source.source_type, title: source.title, coreTruth: source.core_truth,
+      storyEvidence: source.story_evidence, privacyStatus: source.privacy_status, pillars: source.pillars,
+      sourceUrl: source.source_url, retired: source.retired, status: source.status,
+      dispatchWhatHappened: source.dispatch_what_happened, dispatchSpecificDetail: source.dispatch_specific_detail,
+      dispatchDecision: source.dispatch_decision, dispatchOccurredOn: source.dispatch_occurred_on,
+      dispatchNextImplication: source.dispatch_next_implication, dispatchFreshnessDays: source.dispatch_freshness_days,
     });
     const rows = await supabaseRequest<ContentPackage[]>("rpc/save_content_full_script", {
       method: "POST",

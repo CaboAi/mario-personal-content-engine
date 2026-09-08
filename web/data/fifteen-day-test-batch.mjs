@@ -12,6 +12,7 @@ const make = (day, plannedFor, values) => ({
   plannedFor,
   platforms: ["Instagram"],
   publicationClearance: true,
+  mode: "Reflection",
   hookRationale: "The selected opening is specific, points honestly to the body, and earns the lesson through Mario's documented experience.",
   productionNotes: "Record naturally and retain the selected opening, primary goal, and test variable. Do not add unverified details.",
   privacyNotes: "Use only the stated source evidence. Do not add private family or third-party details.",

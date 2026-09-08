@@ -24,7 +24,7 @@ import type {
   ProductionStatus,
   SavedPost,
 } from "@/lib/domain";
-import { generatedDemoPackage } from "@/lib/demo-data";
+import { isSourceAvailableForPairing } from "@/lib/brand-source-eligibility";
 import { fullDraftKind, getLegalFormats, initialProductionStatus, productionStatusesFor, supportsFullDraft } from "@/lib/format-contracts";
 import { getExperimentMetricRows } from "@/lib/performance";
 
@@ -126,9 +126,14 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const inventoryCount = content.filter(
     (item) => !item.archivedAt && item.status !== "Posted",
   ).length;
+  const usableSourceCount = initialData.sources.filter((source) => isSourceAvailableForPairing(source)).length;
 
   async function approveAndGenerate() {
     if (!selectedSave || !selectedPairing) return;
+    if (usableSourceCount === 0) {
+      setError("No usable Mario-owned sources are available. Capture a verified Story or Daily Entry for Reflection or Practical, or a fresh Dispatch entry for Dispatch.");
+      return;
+    }
     if (selectedPairing.privacyStatus === "Needs confirmation") {
       setError("Confirm the private story details before generating this direction.");
       return;
@@ -148,10 +153,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Generation failed.");
         created = result.content;
-      } else {
-        await new Promise((resolve) => window.setTimeout(resolve, 900));
-        created = { ...generatedDemoPackage, mode: selectedMode };
-      }
+      } else throw new Error("No live source inventory is configured. Demo data cannot generate content.");
 
       setContent((items) => [created, ...items.filter((item) => item.id !== created.id)]);
       setSaves((items) =>
@@ -523,7 +525,7 @@ function CommandCenter({
         <p className="section-label">Today’s decision</p>
         <h2>{priority}</h2>
         <p>
-              {todayItem ? `Today focus: ${todayItem.mode ?? "Reflection"} · ${todayItem.format} · ${todayItem.goal} · ${todayItem.selectedHook}` : "The engine can prepare the structure. The decision that matters is which Mario-owned truth deserves the format."}
+              {todayItem ? `Today focus: ${todayItem.mode} · ${todayItem.format} · ${todayItem.goal} · ${todayItem.selectedHook}` : "The engine can prepare the structure. The decision that matters is which Mario-owned truth deserves the format."}
         </p>
         <div className="command-actions"><button className="primary-action" onClick={todayItem ? onOpenProduction : onOpenSaves} type="button">{todayItem ? "Open Today focus" : "Open review queue"}</button><button className="text-action" onClick={onOpenCalendar} type="button">View editorial calendar</button></div>
       </div>
@@ -908,7 +910,7 @@ function ProductionBoard({
           return <article className="production-item" key={item.id}>
             <div className="production-item-heading">
               <div className="production-meta">
-                <span>{item.mode ?? "Reflection"}</span>
+                <span>{item.mode}</span>
                 <span>{item.format}</span>
                 <span>{item.goal}</span>
                 <span>{item.testVariable} test</span>
@@ -1090,7 +1092,7 @@ function ProductionBoard({
               return (
                 <div className="removed-draft" key={item.id}>
                   <div>
-                    <span>{item.mode ?? "Reflection"} · {item.format} · {item.status}</span>
+                    <span>{item.mode} · {item.format} · {item.status}</span>
                     <strong>{item.title}</strong>
                     <small>
                       Removed {item.archivedAt ? formatDate(item.archivedAt) : "from Production"}
@@ -1527,6 +1529,8 @@ function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
     return source.sourceType;
   }
 
+  const usableSources = sources.filter((source) => isSourceAvailableForPairing(source));
+
   return (
     <section className="brand-layout stagger-in">
       <div className="brand-thesis">
@@ -1556,9 +1560,9 @@ function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
       <div className="source-inventory">
         <div className="panel-heading">
           <div><p className="section-label">Live source inventory</p><h3>Mario-owned material in Supabase</h3></div>
-          <span>{sources.length} sources</span>
+          <span>{usableSources.length} usable · {sources.length} recorded</span>
         </div>
-        {sources.length === 0 ? <p>No sources are available.</p> : sources.map((source) => (
+        {usableSources.length === 0 ? <p>No usable Mario-owned sources are available for generation. Capture a verified Story or Daily Entry for Reflection or Practical, or a fresh Dispatch entry for Dispatch.</p> : usableSources.map((source) => (
           <article key={source.id}>
             <div>
               <span>{sourceOrigin(source)}</span>

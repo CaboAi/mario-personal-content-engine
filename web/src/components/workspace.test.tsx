@@ -426,6 +426,23 @@ describe("Production package instructions", () => {
 });
 
 describe("Live brand source inventory", () => {
+  it("names the required intake when the recorded inventory has no usable source", () => {
+    render(
+      <Workspace initialData={{
+        ...demoData,
+        sources: [{
+          id: "retired-source", sourceType: "Existing Content", title: "Archived post",
+          coreTruth: "Historical only.", storyEvidence: "Historical only.", privacyStatus: "Clear",
+          retired: true, pillars: ["Reinvention"], status: "Retired",
+          updatedAt: "2026-09-07T00:00:00Z", usageCount: 0,
+        }],
+      }} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Brand System/ }));
+    expect(screen.getByText(/No usable Mario-owned sources are available for generation/)).toBeTruthy();
+    expect(screen.getByText(/0 usable · 1 recorded/)).toBeTruthy();
+  });
+
   it("shows the current Supabase source status and usage count", () => {
     render(
       <Workspace initialData={{
@@ -437,6 +454,7 @@ describe("Live brand source inventory", () => {
           coreTruth: "Action returned before certainty did.",
           storyEvidence: "Confirmed Story Bank entry.",
           privacyStatus: "Clear",
+          retired: false,
           pillars: ["Reinvention"],
           status: "Verified",
           updatedAt: "2026-08-12T00:00:00Z",

@@ -138,6 +138,7 @@ const overrides = {
 
 export const fifteenDayItems = originalItems.map((item, index) => ({
   ...item,
+  mode: item.mode,
   productionNotes: `${cameraNotes[index + 1]} ${item.productionNotes}`,
   ...overrides[index + 1],
 }));

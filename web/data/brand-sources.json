@@ -1,5 +1,6 @@
 [
   {
+    "retired": true,
     "source_type": "Story",
     "title": "Some moments have an expiration date",
     "core_truth": "Not everything unfinished deserves more of my attention than something meaningful with an expiration date.",
@@ -11,6 +12,7 @@
     "status": "Captured"
   },
   {
+    "retired": true,
     "source_type": "Daily Entry",
     "title": "What stays hidden becomes insecurity",
     "core_truth": "Unspoken fear compounds. Honest conversation interrupts it before it turns into anxiety, insecurity, or jealousy.",
@@ -22,6 +24,7 @@
     "status": "Captured"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "You'll Never Be Ready",
     "core_truth": "Readiness is not a feeling. It is a decision.",
@@ -33,6 +36,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "The Shit Nobody Tells You About Starting Over",
     "core_truth": "You cannot become someone new while protecting someone you used to be.",
@@ -44,6 +48,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Rebuilding in Public",
     "core_truth": "An unfinished reinvention is worth documenting without pretending it is already a success story.",
@@ -55,6 +60,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "The Hardest Part Isn't Money",
     "core_truth": "The hardest loss is often the identity attached to what disappeared, not the thing itself.",
@@ -66,6 +72,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Bring Back Not Giving a Fuck",
     "core_truth": "Trading your future for other people's temporary opinions is too expensive.",
@@ -77,6 +84,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Shit I Wish Someone Told Me Earlier",
     "core_truth": "Confidence and standards are built through action, discomfort, and lessons learned the expensive way.",
@@ -88,6 +96,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Self-Improvement Advice That Can Fuck Off",
     "core_truth": "Advice that only makes you feel better is not always advice that makes you better.",
@@ -99,6 +108,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Stop Looking for a Sign",
     "core_truth": "The right time rarely arrives; taking one real step ends the lie that you are still deciding.",
@@ -110,6 +120,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Your Comfort Zone Is a Manipulative Little Bitch",
     "core_truth": "Recovery should prepare you to move again, not become a permanent address.",
@@ -121,6 +132,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "I Turned Failure Into an Identity",
     "core_truth": "You can own what happened without becoming what happened.",
@@ -132,6 +144,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Nobody Wants You to Start Over",
     "core_truth": "Starting over can be the moment you stop lying to yourself, not proof that you failed.",
@@ -143,6 +156,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Starting Over Is Embarrassing",
     "core_truth": "Starting over in your thirties can feel embarrassing, but you are rebuilding with better information rather than returning to zero.",
@@ -154,6 +168,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "I Wasted Years Waiting to Feel Ready",
     "core_truth": "Confidence usually arrives after action, not before it.",
@@ -165,6 +180,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "I Confused Relief With Peace",
     "core_truth": "Relief that the pain stopped is not the same as liking the life you are building.",
@@ -176,6 +192,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Losing Everything Changed What I Value",
     "core_truth": "Loss strips away the decorations and makes what is actually valuable easier to see.",
@@ -187,6 +204,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "I Don't Want My Old Life Back",
     "core_truth": "Rebuilding does not mean restoring an old identity; it means using what the old life taught you to build something better.",
@@ -198,6 +216,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Accepting Yourself Can Become Bullshit",
     "core_truth": "Self-acceptance without accountability can turn a changeable pattern into a protected excuse.",
@@ -209,6 +228,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "Nobody Is Coming to Start Your Life for You",
     "core_truth": "The next chapter begins when you initiate it; no perfect opportunity or person can start it for you.",
@@ -220,6 +240,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "What You Allow Becomes Your Life",
     "core_truth": "Your real standards are revealed by what you repeatedly tolerate, including the promises and boundaries you break with yourself.",
@@ -231,6 +252,7 @@
     "status": "Verified"
   },
   {
+    "retired": true,
     "source_type": "Existing Content",
     "title": "It Can Always Be Worse",
     "core_truth": "Perspective is not denial; as long as another honest action is available, the game is not over.",

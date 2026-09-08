@@ -5,6 +5,21 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { batch, fifteenDayItems } from "../data/fifteen-day-test-batch-notion.mjs";
 
+function assertLegalBatchMix(items) {
+  if (items.length < 3) return;
+  const counts = { Dispatch: 0, Practical: 0, Reflection: 0 };
+  for (const item of items) {
+    if (!(item.mode in counts)) throw new Error(`Content item ${item.importKey} is missing a valid content mode.`);
+    counts[item.mode] += 1;
+  }
+  const dispatch = (counts.Dispatch / items.length) * 100;
+  const reflection = (counts.Reflection / items.length) * 100;
+  const violations = [];
+  if (dispatch < 50) violations.push(`Dispatch is ${Math.round(dispatch)}%, needs at least 50%.`);
+  if (reflection > 100 / 3) violations.push(`Reflection is ${Math.round(reflection)}%, must be at most 33%.`);
+  if (violations.length) throw new Error(`Batch mode mix is illegal: ${violations.join(" ")}`);
+}
+
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
   for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
@@ -118,6 +133,7 @@ async function upsertSource() {
       pillars: ["Reinvention", "Action", "Life Story"],
       source_external_id: externalId,
       status: "Verified",
+      retired: true,
     }),
   });
   return rows[0].id;
@@ -133,6 +149,7 @@ async function upsertItem(item, batchId, sourceId) {
     source_reference: item.sourceReference,
     title: item.title,
     format: item.format,
+    mode: item.mode,
     goal: item.goal,
     pillars: item.pillars,
     spoken_hooks: item.spokenHooks,
@@ -179,6 +196,7 @@ async function upsertItem(item, batchId, sourceId) {
   }
 }
 
+assertLegalBatchMix(fifteenDayItems);
 const batchId = await upsertBatch();
 const sourceId = await upsertSource();
 for (const item of fifteenDayItems) await upsertItem(item, batchId, sourceId);

@@ -25,7 +25,7 @@ export type BatchMixViolation = {
 };
 
 function contentModeOf(content: Pick<ContentPackage, "mode">): ContentMode {
-  return content.mode ?? "Reflection";
+  return content.mode;
 }
 
 export function getBatchMix(packages: Iterable<Pick<ContentPackage, "mode">>): BatchMix {

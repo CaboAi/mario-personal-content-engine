@@ -55,12 +55,4 @@ describe("batch content-mode mix", () => {
     expect(isLegalBatchMix([{ mode: "Reflection" }, { mode: "Reflection" }])).toBe(true);
     expect(mix.violations).toEqual([]);
   });
-
-  it("treats legacy packages without a mode as Reflection", () => {
-    expect(getBatchMix([{}, {}, { mode: "Dispatch" }]).counts).toEqual({
-      Dispatch: 1,
-      Practical: 0,
-      Reflection: 2,
-    });
-  });
 });

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { BrandSource, SavedPost } from "./domain";
+import { isSourceAvailableForPairing } from "./brand-source-eligibility";
 import { analyzeSavedPost, type SaveInspectionEvidence } from "./save-analysis";
 import { supabaseRequest } from "./supabase-rest";
 
@@ -16,7 +17,14 @@ export async function loadRankableBrandSources() {
       pillars: string[];
       source_url?: string;
       status: string;
-    }>>("brand_sources?status=eq.Verified&privacy_status=eq.Clear&select=*&order=created_at.desc&limit=100"),
+      retired: boolean;
+      dispatch_what_happened?: string;
+      dispatch_specific_detail?: string;
+      dispatch_decision?: string;
+      dispatch_occurred_on?: string;
+      dispatch_next_implication?: string;
+      dispatch_freshness_days?: number;
+    }>>("brand_sources?status=eq.Verified&privacy_status=eq.Clear&retired=eq.false&select=*&order=created_at.desc&limit=100"),
     supabaseRequest<Array<{
       brand_source_id: string;
       recommended: boolean;
@@ -24,7 +32,12 @@ export async function loadRankableBrandSources() {
     }>>("pairings?select=brand_source_id,recommended,created_at&order=created_at.desc&limit=500"),
   ]);
 
-  return sourceRows.map((source) => {
+  return sourceRows.filter((source) => isSourceAvailableForPairing({
+    sourceType: source.source_type,
+    retired: source.retired,
+    dispatchOccurredOn: source.dispatch_occurred_on,
+    dispatchFreshnessDays: source.dispatch_freshness_days,
+  })).map((source) => {
     const history = recommendationRows.filter((pairing) => pairing.brand_source_id === source.id);
     return {
       id: source.id,
@@ -35,6 +48,13 @@ export async function loadRankableBrandSources() {
       privacyStatus: source.privacy_status,
       pillars: source.pillars,
       sourceUrl: source.source_url,
+      retired: source.retired,
+      dispatchWhatHappened: source.dispatch_what_happened,
+      dispatchSpecificDetail: source.dispatch_specific_detail,
+      dispatchDecision: source.dispatch_decision,
+      dispatchOccurredOn: source.dispatch_occurred_on,
+      dispatchNextImplication: source.dispatch_next_implication,
+      dispatchFreshnessDays: source.dispatch_freshness_days,
       usageCount: history.length,
       recommendationCount: history.filter((pairing) => pairing.recommended).length,
       recentlyRecommended: history.some(
@@ -46,7 +66,9 @@ export async function loadRankableBrandSources() {
 
 export async function analyzeAndPersistSave(save: SavedPost, evidence: SaveInspectionEvidence) {
   const sources = await loadRankableBrandSources();
-  if (!sources.length) throw new Error("No Clear and Verified Mario-owned sources are available.");
+  if (!sources.length) {
+    throw new Error("No usable Mario-owned sources are available. Capture a verified Story or Daily Entry for Reflection/Practical, or a fresh Dispatch entry for Dispatch.");
+  }
 
   const analysis = await analyzeSavedPost(save, evidence, sources);
   const rows = await supabaseRequest<SavedPost[]>("rpc/apply_save_analysis", {

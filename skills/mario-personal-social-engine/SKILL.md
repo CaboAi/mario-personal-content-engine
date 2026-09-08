@@ -28,6 +28,18 @@ Start from exactly one of:
 - A developed Daily Entries & Content record containing both Core Truth and Story or Evidence.
 - An existing Content Production item being revised.
 
+Use a verified Story or Daily Entry for Reflection and Practical. Use a fresh, verified Dispatch log entry for Dispatch; it must state what happened, its number or specific detail, Mario's decision, the date, what happens next, and privacy status. Dispatch entries expire 30 days after their date and cannot feed Reflection.
+
+Dispatch capture template:
+
+- What happened (concrete event)
+- Number or specific detail
+- Decision Mario made or is making
+- Date it occurred
+- What it implies about the next one
+- Privacy status
+- Freshness window: 30 days from the occurrence date
+
 Do not use a saved creator's topic as the source. When a save is provided, extract delivery DNA only: hook syntax, pacing, slide structure, edit rhythm, visual treatment, or CTA placement.
 
 When working from the Instagram Saves staging database, read `references/saved-post-workflow.md` and follow its approval states exactly.
@@ -103,6 +115,8 @@ Compare posts at the same review window when possible. Identify outliers by the 
 Keep daily posting as the floor and provide optional secondary inventory for twice-daily posting. Balance formats without forcing quotas. Do not reuse the same story merely to fill inventory.
 
 For any batch of three or more, Reflection may not exceed one-third of the items. Report actual and target shares: Dispatch 60%, Practical 25%, Reflection 15%.
+
+Dispatch must also make up at least half of every batch of three or more. Stop batch generation when the Story/Daily Entry pool cannot support Practical and Reflection or the fresh Dispatch log cannot support Dispatch.
 
 ## Format behavior
 

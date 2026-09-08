@@ -12,6 +12,7 @@ function candidate(overrides: Partial<PairingCandidate> & Pick<PairingCandidate,
     storyEvidence: "Verified evidence.",
     pillars: ["Action"],
     privacyStatus: "Clear",
+    retired: false,
     fitScore: 80,
     angleCategory: "Lived story",
     usageCount: 0,
@@ -51,5 +52,13 @@ describe("selectDiversePairings", () => {
     ]);
     expect(result).toHaveLength(1);
     expect(result[0].fitScore).toBe(91);
+  });
+
+  it("never selects retired sources", () => {
+    const result = selectDiversePairings([
+      candidate({ brandSourceId: "retired", sourceTitle: "Retired", fitScore: 99, retired: true }),
+      candidate({ brandSourceId: "current", sourceTitle: "Current", fitScore: 80 }),
+    ]);
+    expect(result.map((item) => item.brandSourceId)).toEqual(["current"]);
   });
 });

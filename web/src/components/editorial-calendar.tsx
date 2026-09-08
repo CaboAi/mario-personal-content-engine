@@ -74,7 +74,7 @@ export function EditorialCalendar({ batches, content, onReschedule, onOpenProduc
           <button className="calendar-card-main" type="button" onClick={() => setSelectedId(item.id)}>
             <span className="calendar-date">{prettyDate(item.plannedFor)}</span>
             <strong>{item.title}</strong>
-            <span>{item.mode ?? "Reflection"} · {item.format} · {item.goal} · {item.testVariable} test</span>
+            <span>{item.mode} · {item.format} · {item.goal} · {item.testVariable} test</span>
             <div><span className={`status-pill status-${item.status.toLowerCase().replaceAll(" ", "-")}`}>{item.status}</span>{item.publicationClearance === false && <span className="calendar-privacy">Needs approval</span>}</div>
           </button>
           <label className="calendar-date-edit"><span>Planned date</span><input aria-label={`Planned date for ${item.title}`} type="date" value={item.plannedFor ?? ""} disabled={update?.saving} onChange={(event) => void onReschedule(item.id, event.target.value || null)} /></label>
@@ -88,7 +88,7 @@ export function EditorialCalendar({ batches, content, onReschedule, onOpenProduc
       <button type="button" className="text-action" onClick={() => setSelectedId(null)}>Close</button>
       <p className="section-label">Selected package</p>
       <h3>{selected.title}</h3>
-      <p><strong>Mode:</strong> {selected.mode ?? "Reflection"}</p>
+      <p><strong>Mode:</strong> {selected.mode}</p>
       <p><strong>Selected hook:</strong> {selected.selectedHook}</p>
       <p><strong>Source:</strong> {selected.sourceReference ?? selected.sourceTitle}</p>
       {selected.privacyNotes && <p className="calendar-detail-note"><strong>Privacy:</strong> {selected.privacyNotes}</p>}

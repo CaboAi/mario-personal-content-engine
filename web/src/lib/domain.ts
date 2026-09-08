@@ -34,11 +34,13 @@ export type ContentFormat =
 
 export type ContentMode = "Dispatch" | "Practical" | "Reflection";
 
+export type BrandSourceType = "Story" | "Daily Entry" | "Existing Content" | "Dispatch";
+
 export type Pairing = {
   id: string;
   brandSourceId?: string;
   title: string;
-  sourceType: "Story" | "Daily Entry" | "Existing Content";
+  sourceType: BrandSourceType;
   sourceTitle: string;
   sourceUrl?: string;
   rationale: string;
@@ -46,6 +48,9 @@ export type Pairing = {
   coreTruth?: string;
   storyEvidence?: string;
   pillars?: string[];
+  retired?: boolean;
+  dispatchOccurredOn?: string;
+  dispatchFreshnessDays?: number;
   privacyStatus: "Clear" | "Needs confirmation";
   recommended?: boolean;
   selectionRole?: "Best structural fit" | "Different Mario lens" | "Credible wildcard";
@@ -82,6 +87,13 @@ export type BrandSource = {
   privacyStatus: Pairing["privacyStatus"];
   pillars: string[];
   sourceUrl?: string;
+  retired: boolean;
+  dispatchWhatHappened?: string;
+  dispatchSpecificDetail?: string;
+  dispatchDecision?: string;
+  dispatchOccurredOn?: string;
+  dispatchNextImplication?: string;
+  dispatchFreshnessDays?: number;
 };
 
 export type BrandSourceInventory = BrandSource & {
@@ -106,7 +118,7 @@ export type ContentPackage = {
   sourceTitle: string;
   sourceReference?: string;
   format: ContentFormat;
-  mode?: ContentMode;
+  mode: ContentMode;
   goal: "Reach" | "Shares" | "Saves" | "Follows" | "Trust";
   pillars: string[];
   status: ProductionStatus;

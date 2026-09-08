@@ -61,6 +61,7 @@ function noveltyScore(candidate: PairingCandidate, selected: PairingCandidate[])
 export function selectDiversePairings(candidates: PairingCandidate[]) {
   const bestBySource = new Map<string, PairingCandidate>();
   for (const candidate of candidates) {
+    if (candidate.retired) continue;
     if (normalizedScore(candidate) < 60) continue;
     const existing = bestBySource.get(candidate.brandSourceId);
     if (!existing || stableCandidateOrder(candidate, existing) < 0) {

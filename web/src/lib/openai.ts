@@ -1,6 +1,7 @@
 import "server-only";
 
-import type { ContentFormat, ContentMode, ContentPackage, Pairing, SavedPost } from "./domain";
+import type { BrandSource, ContentFormat, ContentMode, ContentPackage, Pairing, SavedPost } from "./domain";
+import { assertSourceEligibleForMode } from "./brand-source-eligibility";
 import { CONTENT_PILLARS, contentPackageSchema } from "./content-package-schema";
 import {
   fullDraftKind,
@@ -83,10 +84,12 @@ export async function generateContentPackage(
   pairing: Pairing,
   selectedFormat: ContentFormat,
   selectedMode: ContentMode,
+  source: BrandSource,
 ): Promise<Omit<ContentPackage, "id" | "sourceSaveId" | "sourceTitle" | "status" | "platforms" | "createdAt">> {
   if (!isLegalModeFormat(selectedMode, selectedFormat)) {
     throw new Error(`${selectedMode} mode cannot use ${selectedFormat}.`);
   }
+  assertSourceEligibleForMode(source, selectedMode);
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
 
@@ -116,6 +119,14 @@ export async function generateContentPackage(
             rationale: pairing.rationale,
             direction: pairing.direction,
             privacyStatus: pairing.privacyStatus,
+            sourceType: source.sourceType,
+            dispatch: source.sourceType === "Dispatch" ? {
+              whatHappened: source.dispatchWhatHappened,
+              specificDetail: source.dispatchSpecificDetail,
+              decision: source.dispatchDecision,
+              occurredOn: source.dispatchOccurredOn,
+              nextImplication: source.dispatchNextImplication,
+            } : undefined,
           },
         }),
         text: {
@@ -159,13 +170,7 @@ const fullScriptJsonSchema = {
 export async function generateFullScript(
   content: ContentPackage,
   save: SavedPost,
-  source: {
-    title: string;
-    coreTruth: string;
-    storyEvidence: string;
-    privacyStatus: Pairing["privacyStatus"];
-    status: string;
-  },
+  source: BrandSource & { status: string },
 ) {
   if (!supportsFullDraft(content.format)) {
     throw new Error(`${content.format} intentionally does not use a padded full draft.`);
@@ -173,13 +178,14 @@ export async function generateFullScript(
   if (source.privacyStatus !== "Clear" || source.status !== "Verified") {
     throw new Error("The Mario-owned source is not Clear and Verified.");
   }
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
   const draftKind = fullDraftKind(content.format);
-  const contentMode = content.mode ?? "Reflection";
+  const contentMode = content.mode;
   if (!isLegalModeFormat(contentMode, content.format)) {
     throw new Error(`${contentMode} mode cannot use ${content.format}.`);
   }
+  assertSourceEligibleForMode(source, contentMode);
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
   const isWrittenDraft = draftKind === "written draft";
 
   const response = await fetch("https://api.openai.com/v1/responses", {

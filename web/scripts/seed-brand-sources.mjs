@@ -23,6 +23,9 @@ const sources = JSON.parse(
   await fs.readFile(path.join(root, "data", "brand-sources.json"), "utf8"),
 );
 for (const source of sources) {
+  if (typeof source.retired !== "boolean") {
+    throw new Error(`Brand source ${source.source_external_id} must explicitly declare whether it is retired.`);
+  }
   const confirmed = source.privacy_status === "Clear" && source.status === "Verified";
   const unconfirmed = source.privacy_status === "Needs confirmation" && source.status !== "Verified";
   if (!confirmed && !unconfirmed) {

@@ -1,6 +1,6 @@
 # Story bank
 
-Only verified lived moments belong here. Do not turn drafted scripts into facts.
+Only verified lived moments belong here. Do not turn drafted scripts into facts. The story bank feeds Reflection and Practical. Dispatch uses the separate dispatch log below because current operating material expires.
 
 ## Verified story 001: Some moments have an expiration date
 
@@ -10,7 +10,7 @@ Only verified lived moments belong here. Do not turn drafted scripts into facts.
 - Useful tensions: productivity versus presence; guilt versus deliberate choice; urgency versus importance.
 - Eligible pillars: Perspective, Responsibility, Life Story.
 - Privacy check before publishing: Confirm which relationship and timeline details Mario wants public.
-- Status: Needs privacy confirmation before generation.
+- Status: Retired. Do not use for generation.
 
 ## Verified story 002: What stays hidden becomes insecurity
 
@@ -20,9 +20,9 @@ Only verified lived moments belong here. Do not turn drafted scripts into facts.
 - Useful tensions: vulnerability versus concealment; curiosity versus comparison; honesty versus self-protection.
 - Eligible pillars: Identity, Responsibility, Self-Respect, Life Story.
 - Privacy check before publishing: Confirm every relationship detail with Mario and remove details involving another person unless approved.
-- Status: Needs privacy confirmation before generation.
+- Status: Retired. Do not use for generation.
 
-## Public content receipts to develop
+## Retired public content receipts
 
 The account and production database show these stated themes, but they are not complete stories yet:
 
@@ -35,7 +35,7 @@ The account and production database show these stated themes, but they are not c
 - What a person repeatedly allows becomes the real standard.
 - Using “it can always be worse” to restore perspective.
 
-Before using one, capture: what happened, when it happened, what Mario did, what he felt then, what changed, and which details are safe to publish.
+These remain a publication record only. Do not use them for generation.
 
 ## Refill template
 
@@ -52,6 +52,21 @@ Before using one, capture: what happened, when it happened, what Mario did, what
 - Source or date:
 - Status: Captured / Verified / Used / Retired.
 
+## Dispatch log
+
+The dispatch log feeds Dispatch only. It ships empty until Mario captures a current operating update. A dispatch entry expires 30 days after it occurred and cannot feed Reflection.
+
+### Dispatch [number]: [working label]
+
+- What happened (concrete event):
+- Number or specific detail:
+- Decision Mario made or is making:
+- Date it occurred:
+- What it implies about the next one:
+- Privacy status: Clear / Needs confirmation.
+- Freshness window: 30 days from the occurrence date.
+- Status: Captured / Verified / Used / Retired.
+
 ## Refill rule
 
-Maintain at least 10 verified, unused stories or observations before generating large batches. When fewer than five remain, stop batch generation and interview Mario for new material.
+Maintain two usable pools before generating a large batch: verified Story or Daily Entry material for the Practical and Reflection share, and fresh verified Dispatch entries for the Dispatch share. Plan batches against Dispatch 60%, Practical 25%, and Reflection 15%; Reflection may never exceed one-third of a batch of three or more. When either pool cannot support its share, stop batch generation and capture material from Mario.

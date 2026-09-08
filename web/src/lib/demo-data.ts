@@ -68,6 +68,7 @@ export const generatedDemoPackage: ContentPackage = {
   sourceSaveId: demoSave.id,
   sourceTitle: "You'll Never Be Ready",
   format: "Yap Reel",
+  mode: "Reflection",
   goal: "Trust",
   pillars: ["Reinvention", "Action"],
   status: "Script Ready",
