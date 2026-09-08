@@ -27,12 +27,10 @@ describe("Production package instructions", () => {
     render(<Workspace initialData={demoData} />);
 
     expect(screen.getByRole("button", { name: "Command Center" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByText("Home")).toBeTruthy();
-    expect(screen.getByText("Saves")).toBeTruthy();
-    expect(screen.getByText("Make")).toBeTruthy();
-    expect(screen.getByText("Plan")).toBeTruthy();
-    expect(screen.getByText("Results")).toBeTruthy();
-    expect(screen.getByText("Brand")).toBeTruthy();
+    expect(screen.getAllByRole("navigation")[0].querySelectorAll("button")).toHaveLength(7);
+    expect(Array.from(screen.getAllByRole("navigation")[0].querySelectorAll("button")).map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Command Center", "Capture", "Saves Inbox", "Production", "Calendar", "Performance", "Brand System",
+    ]);
 
     fireEvent.click(screen.getByRole("button", { name: "Production" }));
     expect(screen.getByRole("button", { name: "Production" }).getAttribute("aria-current")).toBe("page");
@@ -426,18 +424,31 @@ describe("Production package instructions", () => {
 });
 
 describe("Live brand source inventory", () => {
-  it("shows Dispatch-only fields only after Dispatch is selected", () => {
+  it("starts source capture with a raw brain dump and corrected defaults in review", async () => {
     render(<Workspace initialData={demoData} />);
-    fireEvent.click(screen.getByRole("button", { name: /Brand System/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Capture" }));
 
-    expect(screen.getByText("Capture a source")).toBeTruthy();
+    expect(screen.getByLabelText("Raw source")).toBeTruthy();
     expect(screen.queryByLabelText("What happened")).toBeNull();
-    fireEvent.change(screen.getByLabelText("Source type"), { target: { value: "Dispatch" } });
+    expect(screen.queryByLabelText("Title")).toBeNull();
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ proposal: {
+      sourceType: "Dispatch", classificationReason: "A current decision is present.", title: "A working title",
+      coreTruth: "A clear claim.", storyEvidence: "A concrete detail.", pillars: ["Action"],
+      dispatchWhatHappened: "The event.", dispatchSpecificDetail: "The detail.",
+      dispatchDecision: "The decision.", dispatchOccurredOn: "2026-09-08", dispatchNextImplication: "The next one.", missingFields: [],
+    } }), { status: 200, headers: { "Content-Type": "application/json" } })));
+    fireEvent.change(screen.getByLabelText("Raw source"), { target: { value: "The raw source." } });
+    fireEvent.click(screen.getByRole("button", { name: "Extract" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Classification")).toBeTruthy());
     expect(screen.getByLabelText("What happened")).toBeTruthy();
     expect(screen.getByLabelText("The number or specific detail")).toBeTruthy();
     expect(screen.getByLabelText("The decision you made or are making")).toBeTruthy();
     expect(screen.getByLabelText("When it happened (date)")).toBeTruthy();
     expect(screen.getByLabelText("What it means for the next one")).toBeTruthy();
+    expect((screen.getByLabelText("Privacy status") as HTMLSelectElement).value).toBe("Clear");
+    expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe("Verified");
   });
 
   it("names the required intake when the recorded inventory has no usable source", () => {

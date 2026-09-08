@@ -28,15 +28,16 @@ import { isSourceAvailableForPairing } from "@/lib/brand-source-eligibility";
 import { fullDraftKind, getLegalFormats, initialProductionStatus, productionStatusesFor, supportsFullDraft } from "@/lib/format-contracts";
 import { getExperimentMetricRows } from "@/lib/performance";
 
-type View = "command" | "saves" | "production" | "calendar" | "performance" | "brand";
+type View = "command" | "capture" | "saves" | "production" | "calendar" | "performance" | "brand";
 
 const views = [
   { id: "command", label: "Command Center", shortLabel: "Home", index: "01", icon: House },
-  { id: "saves", label: "Saves Inbox", shortLabel: "Saves", index: "02", icon: BookmarkSimple },
-  { id: "production", label: "Production", shortLabel: "Make", index: "03", icon: VideoCamera },
-  { id: "calendar", label: "Calendar", shortLabel: "Plan", index: "04", icon: CalendarBlank },
-  { id: "performance", label: "Performance", shortLabel: "Results", index: "05", icon: ChartLineUp },
-  { id: "brand", label: "Brand System", shortLabel: "Brand", index: "06", icon: Palette },
+  { id: "capture", label: "Capture", shortLabel: "Capture", index: "02", icon: Palette },
+  { id: "saves", label: "Saves Inbox", shortLabel: "Saves", index: "03", icon: BookmarkSimple },
+  { id: "production", label: "Production", shortLabel: "Make", index: "04", icon: VideoCamera },
+  { id: "calendar", label: "Calendar", shortLabel: "Plan", index: "05", icon: CalendarBlank },
+  { id: "performance", label: "Performance", shortLabel: "Results", index: "06", icon: ChartLineUp },
+  { id: "brand", label: "Brand System", shortLabel: "Brand", index: "07", icon: Palette },
 ] satisfies Array<{
   id: View;
   label: string;
@@ -467,6 +468,10 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
           />
         )}
 
+        {view === "capture" && <CaptureView onSourceCreated={(source) => {
+          setSources((items) => [source, ...items.filter((item) => item.id !== source.id)]);
+        }} />}
+
         {view === "calendar" && (
           <EditorialCalendar
             batches={initialData.batches}
@@ -488,9 +493,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
           />
         )}
 
-        {view === "brand" && <BrandSystem sources={sources} onSourceCreated={(source) => {
-          setSources((items) => [source, ...items.filter((item) => item.id !== source.id)]);
-        }} />}
+        {view === "brand" && <BrandSystem sources={sources} />}
       </main>
     </div>
   );
@@ -1512,13 +1515,7 @@ function PatternSignal({ label, item, metric }: { label: string; item?: Instagra
   return <article className="pattern-signal"><p className="section-label">{label}</p>{item ? <><strong>{mediaLabel(item)}</strong><span>{(item[metric] ?? 0).toLocaleString()} {metric}</span><small>Current historical leader. Treat as an observation until a comparable post repeats the result.</small></> : <span>No imported evidence yet.</span>}</article>;
 }
 
-function BrandSystem({
-  sources,
-  onSourceCreated,
-}: {
-  sources: BrandSourceInventory[];
-  onSourceCreated: (source: BrandSourceInventory) => void;
-}) {
+function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
   const pillars = [
     "Reinvention",
     "Identity",
@@ -1585,7 +1582,6 @@ function BrandSystem({
           </article>
         ))}
       </div>
-      <SourceCaptureForm onSourceCreated={onSourceCreated} />
     </section>
   );
 }
@@ -1605,15 +1601,21 @@ type CaptureValues = {
 function emptySourceCaptureValues(): CaptureValues {
   return {
     title: "", coreTruth: "", storyEvidence: "", pillars: [],
-    privacyStatus: "Needs confirmation", status: "Captured",
+    privacyStatus: "Clear", status: "Verified",
     dispatchWhatHappened: "", dispatchSpecificDetail: "", dispatchDecision: "",
     dispatchOccurredOn: "", dispatchNextImplication: "",
   };
 }
 
-function SourceCaptureForm({ onSourceCreated }: { onSourceCreated: (source: BrandSourceInventory) => void }) {
+function CaptureView({ onSourceCreated }: { onSourceCreated: (source: BrandSourceInventory) => void }) {
+  const [rawText, setRawText] = useState("");
+  const [optionalOccurredOn, setOptionalOccurredOn] = useState("");
   const [sourceType, setSourceType] = useState<CaptureSourceType>("Story");
   const [values, setValues] = useState<CaptureValues>(emptySourceCaptureValues);
+  const [classificationReason, setClassificationReason] = useState("");
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [reviewing, setReviewing] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1633,13 +1635,51 @@ function SourceCaptureForm({ onSourceCreated }: { onSourceCreated: (source: Bran
       : [...values.pillars, pillar]);
   }
 
+  async function extract(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setExtracting(true); setSubmissionError(null); setFieldErrors({});
+    try {
+      const response = await fetch("/api/brand-sources/extract", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText, occurredOn: optionalOccurredOn }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setFieldErrors(result.fieldErrors ?? {});
+        throw new Error(result.error ?? "The raw capture could not be extracted.");
+      }
+      const proposal = result.proposal as {
+        sourceType: CaptureSourceType; classificationReason: string; title: string;
+        coreTruth: string; storyEvidence: string; pillars: string[];
+        dispatchWhatHappened: string; dispatchSpecificDetail: string; dispatchDecision: string;
+        dispatchOccurredOn: string; dispatchNextImplication: string; missingFields: string[];
+      };
+      setSourceType(proposal.sourceType);
+      setClassificationReason(proposal.classificationReason);
+      setMissingFields(proposal.missingFields);
+      setValues({
+        ...emptySourceCaptureValues(), title: proposal.title, coreTruth: proposal.coreTruth,
+        storyEvidence: proposal.storyEvidence, pillars: proposal.pillars,
+        dispatchWhatHappened: proposal.dispatchWhatHappened,
+        dispatchSpecificDetail: proposal.dispatchSpecificDetail, dispatchDecision: proposal.dispatchDecision,
+        dispatchOccurredOn: proposal.dispatchOccurredOn, dispatchNextImplication: proposal.dispatchNextImplication,
+      });
+      setReviewing(true);
+    } catch (cause) {
+      setSubmissionError(cause instanceof Error ? cause.message : "The raw capture could not be extracted.");
+    } finally { setExtracting(false); }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true); setSubmissionError(null); setFieldErrors({});
     try {
       const response = await fetch("/api/brand-sources", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceType, ...values }),
+        body: JSON.stringify({
+          sourceType, ...values,
+          storyEvidence: `Raw capture:\n${rawText.trim()}\n\nExtracted evidence:\n${values.storyEvidence.trim()}`,
+        }),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -1647,36 +1687,54 @@ function SourceCaptureForm({ onSourceCreated }: { onSourceCreated: (source: Bran
         throw new Error(result.error ?? "The source could not be captured.");
       }
       onSourceCreated(result.source as BrandSourceInventory);
+      setRawText(""); setOptionalOccurredOn(""); setClassificationReason(""); setMissingFields([]); setReviewing(false);
       setValues(emptySourceCaptureValues());
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "The source could not be captured.");
     } finally { setSaving(false); }
   }
 
+  if (!reviewing) return (
+    <section className="capture-layout stagger-in">
+      <div className="capture-intro"><p className="section-label">Capture material</p><h2>Start with the messy version.</h2><p>Write what happened, what you have been chewing on, or what you want to make a post about. The review comes after extraction.</p></div>
+      <form className="capture-brain-dump" onSubmit={(event) => void extract(event)} noValidate>
+        <label><span>Raw capture</span><textarea aria-label="Raw source" rows={12} value={rawText} onChange={(event) => setRawText(event.target.value)} placeholder="What happened, what you have been chewing on, or what you want to make a post about." /></label>
+        <label><span>When it happened (optional date)</span><input aria-label="When it happened (optional date)" type="date" value={optionalOccurredOn} onChange={(event) => setOptionalOccurredOn(event.target.value)} /></label>
+        <button className="primary-action" type="submit" disabled={extracting}>{extracting ? "Extracting…" : "Extract"}</button>
+        {fieldErrors.rawText && <p className="inline-error" role="alert">{fieldErrors.rawText}</p>}
+        {submissionError && <p className="inline-error" role="alert">{submissionError}</p>}
+      </form>
+    </section>
+  );
+
   return (
-    <form className="source-capture edits-form" onSubmit={(event) => void submit(event)} noValidate>
-      <div className="panel-heading"><div><p className="section-label">Capture a source</p><h3>Add Mario-owned material</h3></div></div>
-      <label><span>Source type</span><select aria-label="Source type" value={sourceType} onChange={(event) => setSourceType(event.target.value as CaptureSourceType)}>
-        <option value="Story">Story</option><option value="Daily Entry">Daily Entry</option><option value="Dispatch">Dispatch</option>
-      </select></label>
-      <p>Dispatch is for the last 30 days and feeds Dispatch posts; Story and Daily Entry are for older material and feed Reflection and Practical.</p>
-      <SourceField label="Title" field="title" value={values.title} error={fieldErrors.title} onChange={update} />
-      <SourceField label="Core truth" field="coreTruth" value={values.coreTruth} error={fieldErrors.coreTruth} onChange={update} multiline />
-      <SourceField label="Story or evidence" field="storyEvidence" value={values.storyEvidence} error={fieldErrors.storyEvidence} onChange={update} multiline />
-      {sourceType === "Dispatch" && <div className="dispatch-fields">
-        <SourceField label="What happened" field="dispatchWhatHappened" value={values.dispatchWhatHappened} error={fieldErrors.dispatchWhatHappened} onChange={update} multiline />
-        <SourceField label="The number or specific detail" field="dispatchSpecificDetail" value={values.dispatchSpecificDetail} error={fieldErrors.dispatchSpecificDetail} onChange={update} />
-        <SourceField label="The decision you made or are making" field="dispatchDecision" value={values.dispatchDecision} error={fieldErrors.dispatchDecision} onChange={update} multiline />
-        <SourceField label="When it happened (date)" field="dispatchOccurredOn" value={values.dispatchOccurredOn} error={fieldErrors.dispatchOccurredOn} onChange={update} type="date" />
-        <SourceField label="What it means for the next one" field="dispatchNextImplication" value={values.dispatchNextImplication} error={fieldErrors.dispatchNextImplication} onChange={update} multiline />
-      </div>}
-      <fieldset className="source-pillars"><legend>Pillars</legend>{sourcePillars.map((pillar) => <label key={pillar}><input type="checkbox" checked={values.pillars.includes(pillar)} onChange={() => togglePillar(pillar)} />{pillar}</label>)}</fieldset>
-      {fieldErrors.pillars && <small className="inline-error">{fieldErrors.pillars}</small>}
-      <label><span>Privacy status</span><select value={values.privacyStatus} onChange={(event) => update("privacyStatus", event.target.value)}><option value="Needs confirmation">Needs confirmation</option><option value="Clear">Clear</option></select></label>
-      <label><span>Status</span><select value={values.status} onChange={(event) => update("status", event.target.value)}><option value="Captured">Captured</option><option value="Verified">Verified</option><option value="Used">Used</option></select></label>
-      <button className="primary-action" type="submit" disabled={saving}>{saving ? "Capturing…" : "Capture source"}</button>
-      {submissionError && <p className="inline-error" role="alert">{submissionError}</p>}
-    </form>
+    <section className="capture-layout stagger-in">
+      <div className="capture-intro"><p className="section-label">Review extraction</p><h2>Make the source yours before it enters the inventory.</h2><p>Everything below is editable. The raw capture remains attached to this record so you can check or rerun the extraction.</p></div>
+      <form className="capture-review" onSubmit={(event) => void submit(event)} noValidate>
+        <label><span>Raw capture</span><textarea aria-label="Raw capture" rows={7} value={rawText} readOnly /></label>
+        <label><span>Classification</span><select aria-label="Classification" value={sourceType} onChange={(event) => setSourceType(event.target.value as CaptureSourceType)}><option value="Story">Story</option><option value="Daily Entry">Daily Entry</option><option value="Dispatch">Dispatch</option></select></label>
+        <label><span>Why this classification</span><input aria-label="Why this classification" value={classificationReason} onChange={(event) => setClassificationReason(event.target.value)} /></label>
+        {missingFields.length > 0 && <p className="inline-error">Needs your input: {missingFields.join(", ")}.</p>}
+        <p className="capture-routing">Dispatch is for the last 30 days and feeds Dispatch posts; Story and Daily Entry are for older material and feed Reflection and Practical.</p>
+        <SourceField label="Title" field="title" value={values.title} error={fieldErrors.title} onChange={update} />
+        <SourceField label="Core truth" field="coreTruth" value={values.coreTruth} error={fieldErrors.coreTruth} onChange={update} multiline />
+        <SourceField label="Story or evidence" field="storyEvidence" value={values.storyEvidence} error={fieldErrors.storyEvidence} onChange={update} multiline />
+        {sourceType === "Dispatch" && <div className="dispatch-fields">
+          <SourceField label="What happened" field="dispatchWhatHappened" value={values.dispatchWhatHappened} error={fieldErrors.dispatchWhatHappened} onChange={update} multiline />
+          <SourceField label="The number or specific detail" field="dispatchSpecificDetail" value={values.dispatchSpecificDetail} error={fieldErrors.dispatchSpecificDetail} onChange={update} />
+          <SourceField label="The decision you made or are making" field="dispatchDecision" value={values.dispatchDecision} error={fieldErrors.dispatchDecision} onChange={update} multiline />
+          <SourceField label="When it happened (date)" field="dispatchOccurredOn" value={values.dispatchOccurredOn} error={fieldErrors.dispatchOccurredOn} onChange={update} type="date" />
+          <SourceField label="What it means for the next one" field="dispatchNextImplication" value={values.dispatchNextImplication} error={fieldErrors.dispatchNextImplication} onChange={update} multiline />
+        </div>}
+        <fieldset className="source-pillars"><legend>Pillars</legend>{sourcePillars.map((pillar) => <label key={pillar}><input type="checkbox" checked={values.pillars.includes(pillar)} onChange={() => togglePillar(pillar)} /><span>{pillar}</span></label>)}</fieldset>
+        {fieldErrors.pillars && <small className="inline-error">{fieldErrors.pillars}</small>}
+        <label><span>Privacy status</span><select aria-label="Privacy status" value={values.privacyStatus} onChange={(event) => update("privacyStatus", event.target.value)}><option value="Needs confirmation">Needs confirmation</option><option value="Clear">Clear</option></select></label>
+        <label><span>Status</span><select aria-label="Status" value={values.status} onChange={(event) => update("status", event.target.value)}><option value="Captured">Captured</option><option value="Verified">Verified</option><option value="Used">Used</option></select></label>
+        <p className="capture-eligibility">Only Verified + Clear sources can be generated from.</p>
+        <div className="capture-actions"><button className="text-action" type="button" onClick={() => setReviewing(false)}>Back to raw capture</button><button className="primary-action" type="submit" disabled={saving}>{saving ? "Capturing…" : "Capture source"}</button></div>
+        {submissionError && <p className="inline-error" role="alert">{submissionError}</p>}
+      </form>
+    </section>
   );
 }
 
