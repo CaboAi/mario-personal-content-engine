@@ -83,7 +83,6 @@ export type SavedPost = {
   analysisDurationSeconds?: number;
   analysisCutCount?: number;
   analysisFrameStats?: { frameCount?: number; highDetailCount?: number; lowDetailCount?: number; cacheHit?: boolean; recreate?: boolean };
-  shotPlanSkeleton?: ShotPlanSkeleton;
   shotPlan?: ShotPlan;
   shotPlanSourceId?: string;
   shotPlanGeneratedAt?: string;
@@ -96,15 +95,12 @@ export type ShotBeatFunction = "hook" | "bind" | "turn" | "proof" | "pivot" | "C
 export type ShotType = "talking head" | "B-roll" | "screen recording" | "cutaway" | "walking" | "static";
 export type ShotFraming = "close" | "medium" | "wide";
 export type TextPosition = "none" | "top" | "center" | "bottom";
-export type ShotPlanSkeleton = {
-  beats: Array<{ beatFunction: ShotBeatFunction; startSeconds: number; durationSeconds: number; wordCount: number; sentenceType: "question" | "imperative" | "declarative" | "fragment"; directAddress: boolean; shotType: ShotType; framing: ShotFraming; onScreenText: boolean; textPosition: TextPosition }>;
-};
 export type ShotPlan = {
   totalRuntimeSeconds: number;
   pacingNote: string;
-  beats: Array<{ beatFunction: ShotBeatFunction; startSeconds: number; durationSeconds: number; brief: string; candidateLines: string[]; draftLine: string; shotType: ShotType; framing: ShotFraming; onScreenText: { text: string; position: TextPosition; timing: string } | null }>;
+  beats: Array<{ beatFunction: ShotBeatFunction; startSeconds: number; durationSeconds: number; wordCount: number; sentenceType: "question" | "imperative" | "declarative" | "fragment"; directAddress: boolean; brief: string; candidateLines: string[]; draftLine: string; shotType: ShotType; framing: ShotFraming; onScreenText: { text: string; position: TextPosition; timing: string } | null }>;
   productionChecklist: string[];
-  lineReplacementMap: Array<{ beatFunction: ShotBeatFunction; marioReplacementLine: string }>;
+  lineReplacementMap: Array<{ beatFunction: ShotBeatFunction; structuralRole: string; marioReplacementLine: string }>;
 };
 
 export type BrandSource = {

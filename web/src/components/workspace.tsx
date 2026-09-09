@@ -385,7 +385,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Shot plan generation failed.");
-      setSaves((items) => items.map((item) => item.id === save.id ? { ...item, shotPlan: result.shotPlan, shotPlanSkeleton: result.skeleton, shotPlanSourceId: pairing.brandSourceId, shotPlanGeneratedAt: new Date().toISOString() } : item));
+      setSaves((items) => items.map((item) => item.id === save.id ? { ...item, shotPlan: result.shotPlan, shotPlanSourceId: pairing.brandSourceId, shotPlanGeneratedAt: new Date().toISOString() } : item));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Shot plan generation failed.");
     } finally {
@@ -963,11 +963,11 @@ function ShotPlanPanel({ save, pairing, generating, onGenerate }: { save: SavedP
   const plan = save.shotPlan;
   return <section className="format-step shot-plan">
     <div className="pairing-heading"><div><p className="section-label">Shot plan · Recreate</p><h3>{plan ? "Recreate the delivery, not the creator." : "Build the shot-by-shot direction."}</h3></div><span>{save.analysisFrameStats?.frameCount ?? save.analysisFrames?.length ?? 0} cached frames</span></div>
-    {!plan ? <><p className="format-explainer">Uses the cached transcript, measured cut rhythm, and labeled frames. Mario&apos;s lines are written separately from the reference transcript.</p><button type="button" className="secondary-action" disabled={generating} onClick={() => onGenerate(save, pairing)}>{generating ? "Building shot plan…" : "Generate shot plan"}</button></> : <>
+    {!plan ? <><p className="format-explainer">Uses the cached transcript, measured cut rhythm, labeled frames, and Mario&apos;s selected source in one guarded generation.</p><button type="button" className="secondary-action" disabled={generating} onClick={() => onGenerate(save, pairing)}>{generating ? "Building shot plan…" : "Generate shot plan"}</button></> : <>
       <p className="format-explainer">{plan.pacingNote} Total runtime: {plan.totalRuntimeSeconds.toFixed(1)}s.</p>
       <div className="shot-plan-table">{plan.beats.map((beat, index) => <article key={`${beat.startSeconds}-${index}`}><span>{beat.startSeconds.toFixed(1)}–{(beat.startSeconds + beat.durationSeconds).toFixed(1)}s · {beat.beatFunction}</span><strong>{beat.draftLine}</strong><small>{beat.shotType} · {beat.framing}{beat.onScreenText ? ` · text ${beat.onScreenText.position}: ${beat.onScreenText.text}` : ""}</small></article>)}</div>
       <p className="section-label">Production checklist</p><ul>{plan.productionChecklist.map((item) => <li key={item}>{item}</li>)}</ul>
-      <p className="section-label">Line replacement map</p><div className="shot-plan-table">{plan.lineReplacementMap.map((item, index) => <article key={`${item.beatFunction}-${index}`}><span>{item.beatFunction}</span><strong>{item.marioReplacementLine}</strong></article>)}</div>
+      <p className="section-label">Line replacement map</p><div className="shot-plan-table">{plan.lineReplacementMap.map((item, index) => <article key={`${item.beatFunction}-${index}`}><span>{item.beatFunction} · {item.structuralRole}</span><strong>{item.marioReplacementLine}</strong></article>)}</div>
       <button type="button" className="secondary-action" disabled={generating} onClick={() => onGenerate(save, pairing, true)}>{generating ? "Regenerating shot plan…" : "Regenerate shot plan"}</button>
     </>}
   </section>;

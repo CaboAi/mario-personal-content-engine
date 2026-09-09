@@ -3,7 +3,7 @@ import { z } from "zod";
 import { rejectCrossOrigin, requireDashboardSession } from "@/lib/api-auth";
 import { assertSourceEligibleForMode } from "@/lib/brand-source-eligibility";
 import type { BrandSource, Pairing, SavedPost } from "@/lib/domain";
-import { generateShotPlanScript, generateShotPlanSkeleton, shotPlanSkeletonSchema } from "@/lib/shot-plan";
+import { generateShotPlan } from "@/lib/shot-plan";
 import { isLiveMode, supabaseRequest } from "@/lib/supabase-rest";
 
 const bodySchema = z.object({ pairingId: z.string().uuid(), mode: z.enum(["Dispatch", "Practical", "Reflection"]), regenerate: z.boolean().optional().default(false) }).strict();
@@ -43,16 +43,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!source) return NextResponse.json({ error: "Mario source not found." }, { status: 404 });
     assertSourceEligibleForMode(source, parsed.data.mode);
 
-    const skeleton = save.shotPlanSkeleton
-      ? shotPlanSkeletonSchema.parse(save.shotPlanSkeleton)
-      : await generateShotPlanSkeleton(save);
-    const plan = await generateShotPlanScript(save, skeleton, source, parsed.data.mode);
+    const plan = await generateShotPlan(save, source, parsed.data.mode);
     const stored = await supabaseRequest<Array<Record<string, unknown>>>(`saved_posts?id=eq.${encodeURIComponent(id)}`, {
       method: "PATCH", headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ shot_plan_skeleton: skeleton, shot_plan: plan, shot_plan_source_id: source.id, shot_plan_generated_at: new Date().toISOString() }),
+      body: JSON.stringify({ shot_plan_skeleton: null, shot_plan: plan, shot_plan_source_id: source.id, shot_plan_generated_at: new Date().toISOString() }),
     });
     if (!stored[0]) throw new Error("Shot plan could not be stored.");
-    return NextResponse.json({ skeleton, shotPlan: plan, skeletonCacheHit: Boolean(save.shotPlanSkeleton) });
+    return NextResponse.json({ shotPlan: plan, analysisCacheHit: true });
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Shot plan generation failed.";
     return NextResponse.json({ error: message }, { status: 500 });
