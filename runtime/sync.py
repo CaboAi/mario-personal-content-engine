@@ -208,13 +208,72 @@ def build_session(config: dict[str, str]) -> requests.Session:
 
 def validate_session(session: requests.Session) -> None:
     response = session.get(f"{IG_BASE}/accounts/edit/web_form_data/", timeout=15)
-    if response.status_code == 401:
-        raise RuntimeError("Instagram session expired. Refresh the cookies in config.json.")
+    final_url = str(getattr(response, "url", "") or "").lower()
+    content_type = str(response.headers.get("content-type", "") or "").lower()
+    body = str(getattr(response, "text", "") or "")
+    is_html = "text/html" in content_type or body.lstrip().lower().startswith("<!doctype html") or body.lstrip().lower().startswith("<html")
+    if response.status_code == 401 or "/accounts/login" in final_url or is_html:
+        raise RuntimeError(
+            "Instagram session expired or rejected. Refresh the sessionid and csrftoken cookies in runtime/config.json."
+        )
     response.raise_for_status()
     claim = response.headers.get("x-ig-set-www-claim")
     if claim:
         session.headers["X-IG-WWW-Claim"] = claim
     log.info("Instagram session OK")
+
+
+def _redacted_request_headers(headers: Any) -> dict[str, str]:
+    """Make request headers diagnostic-safe: preserve protocol evidence, never cookie values."""
+    redacted: dict[str, str] = {}
+    for name, value in dict(headers or {}).items():
+        normalized_name = str(name).lower()
+        if normalized_name in {"cookie", "x-csrftoken"}:
+            redacted[str(name)] = "<redacted>"
+        else:
+            redacted[str(name)] = str(value)
+    return redacted
+
+
+def classify_instagram_html(body: str, final_url: str) -> str:
+    """Classify the response enough to distinguish auth walls from Instagram's web shell."""
+    lowered = body.lower()
+    url = final_url.lower()
+    if "/accounts/login" in url:
+        return "login page"
+    if "/challenge/" in url or "/checkpoint/" in url:
+        return "challenge/checkpoint page"
+    if "consent" in lowered or "privacy choices" in lowered or "cookie preferences" in lowered:
+        return "consent interstitial"
+    if 'name="username"' in lowered or "loginform" in lowered:
+        return "login page"
+    if "challenge_required" in lowered:
+        return "challenge/checkpoint page"
+    if "<!doctype html" in lowered or "<html" in lowered:
+        return "generic app shell"
+    return "unrecognized response"
+
+
+def debug_all_saved_posts_fetch(session: requests.Session) -> None:
+    """Log a single All Saved Posts request without parsing, syncing, or exposing session data."""
+    response = session.get(saved_posts_endpoint(), timeout=20)
+    chain = [*response.history, response]
+    for index, hop in enumerate(chain, start=1):
+        request = hop.request
+        log.info(
+            "Debug fetch hop %s/%s: request=%s response=%s status=%s",
+            index,
+            len(chain),
+            request.url,
+            hop.url,
+            hop.status_code,
+        )
+        log.info("Debug fetch headers hop %s: %s", index, _redacted_request_headers(request.headers))
+    body_preview = response.text[:500]
+    log.info("Debug fetch final URL: %s", response.url)
+    log.info("Debug fetch final status: %s; redirect count: %s", response.status_code, len(response.history))
+    log.info("Debug fetch body preview (first 500 chars): %r", body_preview)
+    log.info("Debug fetch classification: %s", classify_instagram_html(response.text, response.url))
 
 
 def parse_media(media: dict[str, Any]) -> dict[str, Any] | None:
@@ -617,6 +676,11 @@ def main() -> int:
         help="List collection names and IDs without syncing posts",
     )
     parser.add_argument(
+        "--debug-fetch",
+        action="store_true",
+        help="Diagnose one All Saved Posts response without syncing or writing",
+    )
+    parser.add_argument(
         "--check-notion",
         action="store_true",
         help="Validate the Notion token and data-source access without writing",
@@ -653,6 +717,9 @@ def main() -> int:
 
         session = build_session(config)
         validate_session(session)
+        if args.debug_fetch:
+            debug_all_saved_posts_fetch(session)
+            return 0
         if args.list_collections:
             collections = fetch_collections(session)
             if collections is None:

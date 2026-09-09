@@ -10,10 +10,12 @@ if "requests" not in sys.modules:
 
 from runtime.sync import (
     CollectionFeedUnavailable,
+    classify_instagram_html,
     configured_collections,
     dashboard_payload,
     fetch_collection_posts,
     merge_collection_post,
+    validate_session,
 )
 
 
@@ -33,6 +35,27 @@ class FakeSession:
         if isinstance(response, Exception):
             raise response
         return response
+
+
+class FakeResponse:
+    def __init__(self, *, status_code=200, url="https://www.instagram.com/api/v1/accounts/edit/web_form_data/", text="{}", content_type="application/json"):
+        self.status_code = status_code
+        self.url = url
+        self.text = text
+        self.headers = {"content-type": content_type}
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise FakeHttpError(self.status_code)
+
+
+class SessionCheckStub:
+    def __init__(self, response):
+        self.response = response
+        self.headers = {}
+
+    def get(self, *args, **kwargs):
+        return self.response
 
 
 class CollectionSyncTests(unittest.TestCase):
@@ -89,6 +112,23 @@ class CollectionSyncTests(unittest.TestCase):
             with self.assertLogs("runtime.sync", level="WARNING") as logs:
                 self.assertEqual(fetch_collection_posts(session, "frameworks", "Frameworks", {}), [])
         self.assertIn("Frameworks (frameworks) produced zero posts", "\n".join(logs.output))
+
+    def test_html_classifier_distinguishes_auth_walls_from_the_app_shell(self):
+        self.assertEqual(classify_instagram_html('<form name="loginForm"><input name="username">', "https://www.instagram.com/accounts/login/"), "login page")
+        self.assertEqual(classify_instagram_html("challenge_required", "https://www.instagram.com/challenge/"), "challenge/checkpoint page")
+        self.assertEqual(classify_instagram_html("<html><body>Instagram</body></html>", "https://www.instagram.com/api/v1/feed/saved/posts/"), "generic app shell")
+
+    def test_302_to_login_final_response_fails_the_session_check(self):
+        response = FakeResponse(
+            url="https://www.instagram.com/accounts/login/?next=/api/v1/accounts/edit/web_form_data/",
+            text="<!DOCTYPE html><html><body>Login</body></html>",
+            content_type="text/html; charset=utf-8",
+        )
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Instagram session expired or rejected. Refresh the sessionid and csrftoken cookies in runtime/config.json.",
+        ):
+            validate_session(SessionCheckStub(response))
 
 
 if __name__ == "__main__":
