@@ -271,28 +271,58 @@ def saved_posts_endpoint(collection_id: str | None = None) -> str:
     return f"{IG_BASE}/feed/saved/posts/"
 
 
+class CollectionFeedUnavailable(RuntimeError):
+    """Instagram has retired the per-collection feed endpoint for this session."""
+
+
+def _is_collection_feed_failure(error: Exception) -> bool:
+    if isinstance(error, CollectionFeedUnavailable):
+        return True
+    response = getattr(error, "response", None)
+    return response is not None and getattr(response, "status_code", None) == 404
+
+
+def fetch_collection_posts(
+    session: requests.Session,
+    collection_id: str,
+    collection_label: str,
+    all_saved_posts_cache: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Use Instagram's collection endpoint when available; otherwise filter one shared All Saved Posts feed."""
+    try:
+        return _fetch_saved_posts(session, collection_id)
+    except (CollectionFeedUnavailable, requests.HTTPError) as exc:
+        if not _is_collection_feed_failure(exc):
+            raise
+        log.info(
+            "Collection feed unavailable for %s (%s); filtering All Saved Posts instead.",
+            collection_label,
+            collection_id,
+        )
+        if "posts" not in all_saved_posts_cache:
+            all_saved_posts_cache["posts"] = _fetch_saved_posts(session, None)
+        filtered = [
+            post
+            for post in all_saved_posts_cache["posts"]
+            if collection_id in post.get("saved_collection_ids", [])
+        ]
+        if not filtered:
+            log.warning(
+                "Collection %s (%s) produced zero posts via the All Saved Posts fallback; "
+                "saved_collection_ids may be absent from Instagram's payload.",
+                collection_label,
+                collection_id,
+            )
+        return filtered
+
+
 def fetch_saved_posts(
     session: requests.Session,
     collection_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    try:
-        return _fetch_saved_posts(session, collection_id)
-    except requests.HTTPError as exc:
-        if (
-            not collection_id
-            or exc.response is None
-            or exc.response.status_code != 404
-        ):
-            raise
-        log.warning(
-            "Instagram collection feed returned 404; filtering All Saved Posts for collection %s",
-            collection_id,
-        )
-        return [
-            post
-            for post in _fetch_saved_posts(session, None)
-            if collection_id in post.get("saved_collection_ids", [])
-        ]
+    if not collection_id:
+        return _fetch_saved_posts(session, None)
+    return fetch_collection_posts(session, collection_id, collection_id, {})
 
 
 def _fetch_saved_posts(
@@ -316,6 +346,10 @@ def _fetch_saved_posts(
             data = response.json()
         except ValueError as exc:
             content_type = response.headers.get("content-type", "unknown")
+            if collection_id:
+                raise CollectionFeedUnavailable(
+                    f"Instagram collection feed returned non-JSON data ({content_type})."
+                ) from exc
             raise RuntimeError(
                 f"Instagram returned non-JSON saved-post data ({content_type})."
             ) from exc
@@ -337,22 +371,34 @@ def _fetch_saved_posts(
     return posts
 
 
-def fetch_collections(session: requests.Session) -> list[dict[str, str]]:
-    response = session.get(
-        f"{IG_BASE}/collections/list/",
-        params={
-            "collection_types": '["ALL_MEDIA_AUTO_COLLECTION","PRODUCT_AUTO_COLLECTION","MEDIA"]'
-        },
-        timeout=20,
-    )
-    response.raise_for_status()
+def fetch_collections(session: requests.Session) -> list[dict[str, str]] | None:
+    try:
+        response = session.get(
+            f"{IG_BASE}/collections/list/",
+            params={
+                "collection_types": '["ALL_MEDIA_AUTO_COLLECTION","PRODUCT_AUTO_COLLECTION","MEDIA"]'
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        if getattr(getattr(exc, "response", None), "status_code", None) != 404:
+            raise
+        log.info(
+            "Instagram no longer exposes a usable collections endpoint. Open a saved collection in your browser, "
+            "copy its numeric ID from the collection URL, and add it to ig_collections in runtime/config.json."
+        )
+        return None
     try:
         data = response.json()
     except ValueError as exc:
         content_type = response.headers.get("content-type", "unknown")
-        raise RuntimeError(
-            f"Instagram returned non-JSON collection data ({content_type})."
-        ) from exc
+        log.info(
+            "Instagram returned non-JSON collection data (%s). Open a saved collection in your browser, "
+            "copy its numeric ID from the collection URL, and add it to ig_collections in runtime/config.json.",
+            content_type,
+        )
+        return None
 
     collections: list[dict[str, str]] = []
     for item in data.get("items", []):
@@ -609,6 +655,8 @@ def main() -> int:
         validate_session(session)
         if args.list_collections:
             collections = fetch_collections(session)
+            if collections is None:
+                return 0
             if not collections:
                 log.info("No named collections returned")
             for collection in collections:
@@ -619,10 +667,11 @@ def main() -> int:
             return 0
         collections = [] if args.all_saves else configured_collections(config)
         posts_by_media_id: dict[str, dict[str, Any]] = {}
+        all_saved_posts_cache: dict[str, list[dict[str, Any]]] = {}
         if collections:
             for collection in collections:
                 log.info("Sync target: %s (%s, %s)", collection["label"], collection["id"], collection["purpose"])
-                for post in fetch_saved_posts(session, collection["id"]):
+                for post in fetch_collection_posts(session, collection["id"], collection["label"], all_saved_posts_cache):
                     merge_collection_post(posts_by_media_id, post, collection)
         else:
             log.info("Sync target: all saved posts")
