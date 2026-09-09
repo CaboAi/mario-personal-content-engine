@@ -2,7 +2,10 @@
   "ig_session_id": "YOUR_SESSIONID_COOKIE_VALUE",
   "ig_csrftoken": "YOUR_CSRFTOKEN_COOKIE_VALUE",
   "ig_user_id": "48665551327",
-  "ig_collection_id": "883342611266604",
+  "ig_collections": [
+    { "id": "883342611266604", "label": "Frameworks", "purpose": "reference" },
+    { "id": "<second id>", "label": "Recreate", "purpose": "recreate" }
+  ],
   "notion_token": "",
   "notion_saves_data_source_id": "",
   "dashboard_ingest_url": "https://YOUR-APP.vercel.app/api/ingest",

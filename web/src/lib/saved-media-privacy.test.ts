@@ -17,20 +17,21 @@ describe("saved-media privacy contract", () => {
   it("disables Responses application-state storage and uses bounded frame inputs", () => {
     expect(analysisSource).toContain("store: false");
     expect(analysisSource).toContain('type: "input_image"');
-    expect(analysisSource).toContain(".slice(0, 6)");
+    expect(analysisSource).toContain(".slice(0, 20)");
+    expect(analysisSource).toContain('frame.kind === "fill" && save.collectionPurpose === "recreate" ? "low" : "high"');
   });
 
   it("accepts only compact inline JPEG evidence from the authenticated bridge", () => {
-    expect(ingestRouteSource).toContain("4 * 1024 * 1024");
+    expect(ingestRouteSource).toContain("5 * 1024 * 1024");
     expect(ingestRouteSource).toContain("data:image\\/jpeg;base64");
-    expect(ingestRouteSource).toContain("visual_frames: z.array(visualFrameSchema).max(6)");
+    expect(ingestRouteSource).toContain("visual_frames: z.array(visualFrameSchema).max(20)");
     expect(proxySource).toContain('pathname.startsWith("/api/ingest/")');
   });
 
-  it("persists the sanitized analysis result instead of raw inspection evidence", () => {
+  it("persists sanitized frames and transcript, never raw media files or URLs", () => {
     expect(persistenceSource).toContain("p_analysis: analysis");
-    expect(persistenceSource).not.toContain("visualFrames");
-    expect(persistenceSource).not.toContain("transcript:");
+    expect(persistenceSource).toContain("analysis_frames");
+    expect(persistenceSource).toContain("analysis_transcript");
   });
 
   it("clears stale selected pairings before assigning new reanalysis ranks", () => {

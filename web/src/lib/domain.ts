@@ -65,6 +65,9 @@ export type SavedPost = {
   contentType: "Reel" | "Carousel" | "Post";
   caption: string;
   durationSeconds?: number;
+  collectionIds?: string[];
+  collectionLabels?: string[];
+  collectionPurpose?: "reference" | "recreate";
   savedAt: string;
   status: SaveStatus;
   frameworkDna: string;
@@ -75,7 +78,33 @@ export type SavedPost = {
   analysisMethod?: "Automatic media inspection" | "Caption and optional context" | "Manual inspection";
   analysisEvidenceSummary?: string;
   inspectionNotes?: string;
+  analysisTranscript?: string;
+  analysisFrames?: VisualFrame[];
+  analysisDurationSeconds?: number;
+  analysisCutCount?: number;
+  analysisFrameStats?: { frameCount?: number; highDetailCount?: number; lowDetailCount?: number; cacheHit?: boolean; recreate?: boolean };
+  shotPlanSkeleton?: ShotPlanSkeleton;
+  shotPlan?: ShotPlan;
+  shotPlanSourceId?: string;
+  shotPlanGeneratedAt?: string;
   pairings: Pairing[];
+};
+
+export type VisualFrameKind = "opening" | "post-cut" | "closing" | "fill";
+export type VisualFrame = { label: string; dataUrl: string; timestampSeconds: number; kind: VisualFrameKind };
+export type ShotBeatFunction = "hook" | "bind" | "turn" | "proof" | "pivot" | "CTA";
+export type ShotType = "talking head" | "B-roll" | "screen recording" | "cutaway" | "walking" | "static";
+export type ShotFraming = "close" | "medium" | "wide";
+export type TextPosition = "none" | "top" | "center" | "bottom";
+export type ShotPlanSkeleton = {
+  beats: Array<{ beatFunction: ShotBeatFunction; startSeconds: number; durationSeconds: number; wordCount: number; sentenceType: "question" | "imperative" | "declarative" | "fragment"; directAddress: boolean; shotType: ShotType; framing: ShotFraming; onScreenText: boolean; textPosition: TextPosition }>;
+};
+export type ShotPlan = {
+  totalRuntimeSeconds: number;
+  pacingNote: string;
+  beats: Array<{ beatFunction: ShotBeatFunction; startSeconds: number; durationSeconds: number; brief: string; candidateLines: string[]; draftLine: string; shotType: ShotType; framing: ShotFraming; onScreenText: { text: string; position: TextPosition; timing: string } | null }>;
+  productionChecklist: string[];
+  lineReplacementMap: Array<{ beatFunction: ShotBeatFunction; marioReplacementLine: string }>;
 };
 
 export type BrandSource = {

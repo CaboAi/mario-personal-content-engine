@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import type { BrandSource, SavedPost } from "./domain";
+import type { BrandSource, SavedPost, VisualFrame } from "./domain";
 import { parseStructuredJson } from "./openai-response";
 import { selectDiversePairings, type PairingCandidate } from "./source-diversity";
 import { assertTopicNeutralDelivery } from "./topic-quarantine";
@@ -78,7 +78,10 @@ const jsonSchema = {
 export type SaveInspectionEvidence = {
   transcript?: string;
   visualObservations?: string;
-  visualFrames?: Array<{ label: string; dataUrl: string }>;
+  visualFrames?: VisualFrame[];
+  measuredDurationSeconds?: number;
+  detectedCutCount?: number;
+  frameStats?: { frame_count: number; high_detail_count: number; low_detail_count: number; cache_hit: boolean; recreate: boolean };
   optionalContext?: string;
   method: "Automatic media inspection" | "Caption and optional context" | "Manual inspection";
 };
@@ -110,11 +113,11 @@ export function buildSaveAnalysisRequest(
   });
   const inputContent: Array<
     | { type: "input_text"; text: string }
-    | { type: "input_image"; image_url: string; detail: "high" }
+    | { type: "input_image"; image_url: string; detail: "high" | "low" }
   > = [{ type: "input_text", text: evidenceText }];
-  for (const frame of (evidence.visualFrames || []).slice(0, 6)) {
+  for (const frame of (evidence.visualFrames || []).slice(0, 20)) {
     inputContent.push({ type: "input_text", text: `Visual evidence label: ${frame.label}` });
-    inputContent.push({ type: "input_image", image_url: frame.dataUrl, detail: "high" });
+    inputContent.push({ type: "input_image", image_url: frame.dataUrl, detail: frame.kind === "fill" && save.collectionPurpose === "recreate" ? "low" : "high" });
   }
 
   return {
@@ -197,5 +200,44 @@ export async function analyzeSavedPost(
       fitScore: candidate.fitScore,
       selectionRole: candidate.selectionRole,
     })),
+  };
+}
+
+const directionRefreshSchema = z.object({
+  candidates: z.array(z.object({
+    brandSourceId: z.string().uuid(), title: z.string().min(1), rationale: z.string().min(1), direction: z.string().min(1),
+    fitScore: z.number().min(0).max(100), angleCategory: z.enum(angleCategories),
+  }).strict()).max(12),
+}).strict();
+
+export async function refreshSaveDirections(save: SavedPost, sources: RankableSource[]) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(buildRefreshSaveDirectionsRequest(save, sources)),
+  });
+  if (!response.ok) throw new Error(`OpenAI direction refresh failed (${response.status}).`);
+  const raw = directionRefreshSchema.parse(parseStructuredJson(await response.json()));
+  const sourceById = new Map(sources.map((source) => [source.id, source]));
+  const candidates = raw.candidates.flatMap((candidate): PairingCandidate[] => {
+    const source = sourceById.get(candidate.brandSourceId);
+    if (!source) return [];
+    return [{ brandSourceId: source.id, title: candidate.title, sourceType: source.sourceType, sourceTitle: source.title, sourceUrl: source.sourceUrl, coreTruth: source.coreTruth, storyEvidence: source.storyEvidence, pillars: source.pillars, privacyStatus: source.privacyStatus, sourceStatus: source.status, retired: source.retired, dispatchOccurredOn: source.dispatchOccurredOn, dispatchFreshnessDays: source.dispatchFreshnessDays, rationale: candidate.rationale, direction: candidate.direction, fitScore: candidate.fitScore, angleCategory: candidate.angleCategory, usageCount: source.usageCount, recommendationCount: source.recommendationCount }];
+  });
+  return {
+    frameworkDna: save.frameworkDna, hookMechanics: save.hookMechanics, visualPacing: save.visualPacing,
+    prohibitedTransfer: save.prohibitedTransfer, creatorTopicTerms: save.creatorTopicTerms ?? [],
+    analysisEvidenceSummary: save.analysisEvidenceSummary ?? "Existing delivery analysis retained.", analysisMethod: save.analysisMethod ?? "Caption and optional context",
+    pairings: selectDiversePairings(candidates).map((candidate) => ({ brandSourceId: candidate.brandSourceId, title: candidate.title, rationale: candidate.rationale, direction: candidate.direction, fitScore: candidate.fitScore, selectionRole: candidate.selectionRole })),
+  };
+}
+
+export function buildRefreshSaveDirectionsRequest(save: SavedPost, sources: RankableSource[]) {
+  return {
+    model: process.env.OPENAI_MODEL || "gpt-5-mini", store: false,
+    instructions: "Refresh only the Mario-source directions for an already analyzed saved reference. The supplied framework, hook mechanics, and visual pacing are already topic-neutral delivery data; preserve them exactly. Do not inspect, request, or recreate media, transcript, creator topic, wording, claims, examples, metaphors, or identity. Evaluate the supplied usable Mario sources for structural compatibility and return up to twelve candidates. Never invent Mario facts.",
+    input: JSON.stringify({ delivery: { frameworkDna: save.frameworkDna, hookMechanics: save.hookMechanics, visualPacing: save.visualPacing }, marioOwnedSources: sources }),
+    text: { format: { type: "json_schema", name: "save_direction_refresh", strict: true, schema: { type: "object", additionalProperties: false, required: ["candidates"], properties: { candidates: jsonSchema.properties.candidates } } } },
   };
 }

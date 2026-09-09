@@ -24,6 +24,11 @@ const ingestSchema = z
     caption: z.string().max(20_000).optional().default(""),
     duration_seconds: z.number().finite().nonnegative().max(86_400).nullable().optional(),
     saved_at: z.string().datetime({ offset: true }).optional(),
+    collections: z.array(z.object({
+      id: z.string().trim().min(1).max(128),
+      label: z.string().trim().min(1).max(128),
+      purpose: z.enum(["reference", "recreate"]),
+    }).strict()).max(20).optional().default([]),
   })
   .strict();
 
@@ -57,6 +62,20 @@ export async function POST(request: Request) {
   }
   const body = parsed.data;
 
+  const existing = await supabaseRequest<Array<{
+    collection_ids?: string[]; collection_labels?: string[]; collection_purpose?: "reference" | "recreate";
+  }>>(
+    `saved_posts?instagram_media_id=eq.${encodeURIComponent(body.instagram_media_id)}&select=collection_ids,collection_labels,collection_purpose&limit=1`,
+  );
+  const collectionLabels = new Map<string, string>();
+  for (const [index, id] of (existing[0]?.collection_ids ?? []).entries()) {
+    collectionLabels.set(id, existing[0]?.collection_labels?.[index] ?? id);
+  }
+  for (const collection of body.collections) collectionLabels.set(collection.id, collection.label);
+  const collections = [...collectionLabels].map(([id, label]) => ({ id, label }));
+  const collectionPurpose = body.collections.some((collection) => collection.purpose === "recreate")
+    || existing[0]?.collection_purpose === "recreate" ? "recreate" : "reference";
+
   const rows = await supabaseRequest<Array<{ id: string; status: string }>>(
     "saved_posts?on_conflict=instagram_media_id",
     {
@@ -71,6 +90,9 @@ export async function POST(request: Request) {
         caption: body.caption,
         duration_seconds: body.duration_seconds ?? null,
         saved_at: body.saved_at || new Date().toISOString(),
+        collection_ids: collections.map((collection) => collection.id),
+        collection_labels: collections.map((collection) => collection.label),
+        collection_purpose: collectionPurpose,
       }),
     },
   );

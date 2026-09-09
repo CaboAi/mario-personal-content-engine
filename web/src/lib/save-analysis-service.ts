@@ -2,7 +2,7 @@ import "server-only";
 
 import type { BrandSource, SavedPost } from "./domain";
 import { isSourceUsable } from "./brand-source-eligibility";
-import { analyzeSavedPost, type SaveInspectionEvidence } from "./save-analysis";
+import { analyzeSavedPost, refreshSaveDirections, type SaveInspectionEvidence } from "./save-analysis";
 import { supabaseRequest } from "./supabase-rest";
 
 export async function loadRankableBrandSources() {
@@ -81,5 +81,35 @@ export async function analyzeAndPersistSave(save: SavedPost, evidence: SaveInspe
       p_analysis: analysis,
     }),
   });
+  if (evidence.method !== "Automatic media inspection") return rows[0];
+  const [updated] = await supabaseRequest<SavedPost[]>(`saved_posts?id=eq.${encodeURIComponent(save.id)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      analysis_transcript: evidence.transcript ?? "",
+      analysis_frames: evidence.visualFrames ?? [],
+      analysis_duration_seconds: evidence.measuredDurationSeconds ?? null,
+      analysis_cut_count: evidence.detectedCutCount ?? 0,
+      analysis_frame_stats: {
+        frameCount: evidence.frameStats?.frame_count ?? evidence.visualFrames?.length ?? 0,
+        highDetailCount: evidence.frameStats?.high_detail_count ?? evidence.visualFrames?.length ?? 0,
+        lowDetailCount: evidence.frameStats?.low_detail_count ?? 0,
+        cacheHit: false,
+        recreate: evidence.frameStats?.recreate ?? save.collectionPurpose === "recreate",
+      },
+    }),
+  });
+  if (!updated) throw new Error("Automatic analysis evidence could not be cached.");
+  const refreshed = await supabaseRequest<SavedPost[]>(
+    `dashboard_saved_posts?id=eq.${encodeURIComponent(save.id)}&select=*`,
+  );
+  return refreshed[0] ?? rows[0];
+}
+
+export async function refreshAndPersistSaveDirections(save: SavedPost) {
+  const sources = await loadRankableBrandSources();
+  if (!sources.length) throw new Error("No usable Mario-owned sources are available for directions.");
+  const analysis = await refreshSaveDirections(save, sources);
+  const rows = await supabaseRequest<SavedPost[]>("rpc/apply_save_analysis", { method: "POST", body: JSON.stringify({ p_saved_post_id: save.id, p_analysis: analysis }) });
   return rows[0];
 }

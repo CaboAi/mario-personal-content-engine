@@ -20,7 +20,9 @@ import requests
 
 MAX_MEDIA_BYTES = 100 * 1024 * 1024
 MAX_VISUAL_FRAMES = 6
+MAX_RECREATE_VISUAL_FRAMES = 20
 MAX_FRAME_BYTES = 450 * 1024
+MAX_RECREATE_FRAME_PAYLOAD_BYTES = 3 * 1024 * 1024
 ALLOWED_MEDIA_HOST_SUFFIXES = (".cdninstagram.com", ".fbcdn.net")
 _MODELS: dict[tuple[str, str], Any] = {}
 
@@ -145,7 +147,7 @@ def transcribe_video(path: Path, model_name: str, model_cache: Path) -> tuple[st
     return transcript[:40_000], summary
 
 
-def inspect_video_mechanics(path: Path) -> str:
+def inspect_video_mechanics(path: Path) -> dict[str, Any]:
     try:
         import av
         import numpy as np
@@ -159,13 +161,13 @@ def inspect_video_mechanics(path: Path) -> str:
     with av.open(str(path)) as container:
         stream = next((candidate for candidate in container.streams if candidate.type == "video"), None)
         if stream is None:
-            return "The asset contains audio but no decodable video stream."
+            return {"duration_seconds": 0.0, "cut_times": [], "cut_count": 0, "summary": "The asset contains audio but no decodable video stream."}
         width, height = int(stream.width or 0), int(stream.height or 0)
         if stream.duration is not None and stream.time_base is not None:
             duration = float(stream.duration * stream.time_base)
         elif container.duration is not None:
             duration = float(container.duration / 1_000_000)
-        sample_interval = max(duration / 20.0, 0.5) if duration else 1.0
+        sample_interval = 0.25 if duration else 1.0
         next_sample = 0.0
         for frame in container.decode(stream):
             timestamp = float(frame.time or 0.0)
@@ -174,7 +176,7 @@ def inspect_video_mechanics(path: Path) -> str:
             gray = frame.reformat(width=64, height=36, format="gray").to_ndarray().astype("float32")
             samples.append(gray)
             next_sample = timestamp + sample_interval
-            if len(samples) >= 24:
+            if len(samples) >= 240:
                 break
 
     differences = [float(np.mean(np.abs(current - previous))) for previous, current in zip(samples, samples[1:])]
@@ -188,11 +190,19 @@ def inspect_video_mechanics(path: Path) -> str:
         else f"about {strong_changes} strong sampled visual transition{'s' if strong_changes != 1 else ''}"
     )
     duration_phrase = f" over {duration:.1f} seconds" if duration and math.isfinite(duration) else ""
-    return (
+    summary = (
         f"Decoded a {orientation} {width}x{height} video{duration_phrase}. "
         f"Sampled frame activity is {motion}, with {transition_phrase}. "
         "This is mechanical evidence only; it does not identify the creator's topic or visual subject."
     )
+    cut_times: list[float] = []
+    previous_cut = -1.0
+    for index, difference in enumerate(differences, start=1):
+        timestamp = index * sample_interval
+        if difference >= 24.0 and timestamp - previous_cut >= 0.5:
+            cut_times.append(min(timestamp, duration))
+            previous_cut = timestamp
+    return {"duration_seconds": duration, "cut_times": cut_times, "cut_count": len(cut_times), "summary": summary}
 
 
 def _frame_dimensions(width: int, height: int, max_dimension: int) -> tuple[int, int]:
@@ -227,13 +237,65 @@ def _encode_frame_as_jpeg(frame: Any, *, max_dimension: int = 640) -> bytes:
     return encoded
 
 
-def _visual_frame(frame: Any, label: str) -> dict[str, str]:
-    encoded = base64.b64encode(_encode_frame_as_jpeg(frame)).decode("ascii")
-    return {"label": label, "data_url": f"data:image/jpeg;base64,{encoded}"}
+def _visual_frame(frame: Any, *, timestamp: float, kind: str, max_dimension: int = 640) -> dict[str, Any]:
+    encoded = base64.b64encode(_encode_frame_as_jpeg(frame, max_dimension=max_dimension)).decode("ascii")
+    return {
+        "label": f"{kind} at {timestamp:.1f}s",
+        "timestamp_seconds": round(timestamp, 2),
+        "kind": kind,
+        "data_url": f"data:image/jpeg;base64,{encoded}",
+    }
 
 
-def extract_video_visual_frames(path: Path) -> list[dict[str, str]]:
-    """Extract a few representative frames without persisting them beyond temp storage."""
+def _evenly_spaced_times(duration: float, count: int) -> list[float]:
+    if count <= 1 or duration <= 0:
+        return [0.0]
+    return [duration * index / (count - 1) for index in range(count)]
+
+
+def _widely_spaced_cut_times(cut_times: list[float], limit: int) -> list[float]:
+    if len(cut_times) <= limit:
+        return cut_times
+    selected = [cut_times[0], cut_times[-1]] if limit > 1 else [cut_times[0]]
+    while len(selected) < limit:
+        candidate = max(
+            (time for time in cut_times if time not in selected),
+            key=lambda time: min(abs(time - chosen) for chosen in selected),
+        )
+        selected.append(candidate)
+    return sorted(selected)
+
+
+def _payload_guard(frames: list[dict[str, Any]], budget: int = MAX_RECREATE_FRAME_PAYLOAD_BYTES) -> list[dict[str, Any]]:
+    """Keep high-value cut frames; discard only low-detail fills when the request is too large."""
+    kept = list(frames)
+    while sum(len(str(frame["data_url"]).encode("utf-8")) for frame in kept) > budget:
+        fill_index = next((index for index, frame in enumerate(kept) if frame["kind"] == "fill"), None)
+        if fill_index is None:
+            raise ValueError("Recreate frame payload exceeds the safe limit without any fill samples to remove.")
+        kept.pop(fill_index)
+    return kept
+
+
+def plan_video_frame_targets(duration: float, cut_times: list[float], *, recreate: bool) -> list[tuple[float, str]]:
+    """Choose frame times before decoding: cut grammar first, uniform confirmation second."""
+    if not recreate:
+        return [(time, "opening" if index == 0 else "closing" if index == MAX_VISUAL_FRAMES - 1 else "fill") for index, time in enumerate(_evenly_spaced_times(duration, MAX_VISUAL_FRAMES))]
+    target_count = max(MAX_VISUAL_FRAMES, min(MAX_RECREATE_VISUAL_FRAMES, round(duration / 3.0)))
+    selected_cuts = _widely_spaced_cut_times(cut_times, max(0, target_count - 2))
+    targets = [(0.0, "opening"), *[(min(duration, cut + 0.1), "post-cut") for cut in selected_cuts], (max(0.0, duration - 0.1), "closing")]
+    existing_times = [time for time, _ in targets]
+    for time in _evenly_spaced_times(duration, target_count):
+        if len(targets) >= target_count:
+            break
+        if all(abs(time - existing) >= 0.35 for existing in existing_times):
+            targets.append((time, "fill"))
+            existing_times.append(time)
+    return sorted(targets, key=lambda item: item[0])
+
+
+def extract_video_visual_frames(path: Path, *, recreate: bool = False, mechanics: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Extract labeled frames. Recreate saves preserve cut grammar; reference saves stay lightweight."""
     try:
         import av
     except ImportError as exc:
@@ -251,26 +313,18 @@ def extract_video_visual_frames(path: Path) -> list[dict[str, str]]:
         else:
             duration = 0.0
 
-        if duration > 1:
-            targets = [
-                (0.0, "Opening frame"),
-                (max(0.5, duration * 0.12), "Early frame"),
-                (duration * 0.5, "Middle frame"),
-                (max(0.0, duration - 0.5), "Closing frame"),
-            ]
-        else:
-            targets = [(0.0, "Opening frame")]
+        targets = plan_video_frame_targets(duration, list((mechanics or {}).get("cut_times") or []), recreate=recreate)
 
         target_index = 0
         for frame in container.decode(stream):
             timestamp = float(frame.time or 0.0)
             while target_index < len(targets) and timestamp + 0.05 >= targets[target_index][0]:
-                target_time, label = targets[target_index]
-                frames.append(_visual_frame(frame, f"{label} at {target_time:.1f}s"))
+                target_time, kind = targets[target_index]
+                frames.append(_visual_frame(frame, timestamp=target_time, kind=kind, max_dimension=384 if recreate else 640))
                 target_index += 1
             if target_index >= len(targets):
                 break
-    return frames[:MAX_VISUAL_FRAMES]
+    return _payload_guard(frames) if recreate else frames[:MAX_VISUAL_FRAMES]
 
 
 def extract_static_visual_frame(path: Path, label: str) -> dict[str, str]:
@@ -286,7 +340,7 @@ def extract_static_visual_frame(path: Path, label: str) -> dict[str, str]:
         frame = next(container.decode(stream), None)
         if frame is None:
             raise RuntimeError("The saved image did not contain a decodable frame.")
-        return _visual_frame(frame, label)
+        return _visual_frame(frame, timestamp=0.0, kind="fill")
 
 
 def inspect_saved_media(
@@ -295,6 +349,7 @@ def inspect_saved_media(
     model_name: str = "small.en",
     model_cache: Path,
     session: requests.Session | None = None,
+    recreate: bool = False,
 ) -> dict[str, Any]:
     assets = list(post.get("_analysis_assets") or [])
     if not assets:
@@ -312,14 +367,19 @@ def inspect_saved_media(
             download_asset(str(video["url"]), destination, session=session)
             transcript, speech_summary = transcribe_video(destination, model_name, model_cache)
             mechanics = inspect_video_mechanics(destination)
-            visual_frames = extract_video_visual_frames(destination)
+            visual_frames = extract_video_visual_frames(destination, recreate=recreate, mechanics=mechanics)
+            high_detail_count = sum(frame["kind"] != "fill" for frame in visual_frames) if recreate else len(visual_frames)
+            low_detail_count = len(visual_frames) - high_detail_count if recreate else 0
             return {
                 "transcript": transcript,
                 "visual_observations": (
-                    f"{speech_summary} {mechanics} "
+                    f"{speech_summary} {mechanics['summary']} "
                     f"{len(visual_frames)} representative frame(s) accompany this evidence."
                 ),
                 "visual_frames": visual_frames,
+                "measured_duration_seconds": mechanics["duration_seconds"],
+                "detected_cut_count": mechanics["cut_count"],
+                "frame_stats": {"frame_count": len(visual_frames), "high_detail_count": high_detail_count, "low_detail_count": low_detail_count, "cache_hit": False, "recreate": recreate},
             }
 
         visual_frames: list[dict[str, str]] = []
@@ -340,4 +400,7 @@ def inspect_saved_media(
                 f"{len(visual_frames)} slide frame(s) accompany this evidence for visual inspection."
             ),
             "visual_frames": visual_frames,
+            "measured_duration_seconds": 0.0,
+            "detected_cut_count": 0,
+            "frame_stats": {"frame_count": len(visual_frames), "high_detail_count": len(visual_frames), "low_detail_count": 0, "cache_hit": False, "recreate": recreate},
         }

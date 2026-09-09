@@ -1,23 +1,32 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { SavedPost } from "@/lib/domain";
+import { hasCachedAutomaticMediaAnalysis } from "@/lib/save-analysis-cache";
 import { analyzeAndPersistSave } from "@/lib/save-analysis-service";
 import { secureCompare } from "@/lib/session";
 import { isLiveMode, supabaseRequest } from "@/lib/supabase-rest";
 
-const MAX_BODY_BYTES = 4 * 1024 * 1024;
+const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const visualFrameSchema = z.object({
   label: z.string().trim().min(1).max(100),
   data_url: z
     .string()
     .max(625_000)
     .regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/),
+  timestamp_seconds: z.number().finite().min(0).max(86_400).optional().default(0),
+  kind: z.enum(["opening", "post-cut", "closing", "fill"]).optional().default("fill"),
 }).strict();
 const requestSchema = z.object({
   instagram_media_id: z.string().trim().min(1).max(128),
   transcript: z.string().trim().max(40_000).optional().default(""),
   visual_observations: z.string().trim().max(20_000).optional().default(""),
-  visual_frames: z.array(visualFrameSchema).max(6).optional().default([]),
+  visual_frames: z.array(visualFrameSchema).max(20).optional().default([]),
+  measured_duration_seconds: z.number().finite().min(0).max(86_400).nullable().optional(),
+  detected_cut_count: z.number().int().min(0).max(1_000).optional().default(0),
+  frame_stats: z.object({
+    frame_count: z.number().int().min(0).max(20), high_detail_count: z.number().int().min(0).max(20),
+    low_detail_count: z.number().int().min(0).max(20), cache_hit: z.boolean(), recreate: z.boolean(),
+  }).strict().optional(),
   optional_context: z.string().trim().max(2_000).optional().default(""),
   force: z.boolean().optional().default(false),
 }).strict().refine(
@@ -68,7 +77,7 @@ export async function POST(request: Request) {
   if (save.status === "Used") {
     return NextResponse.json({ save, skipped: true, reason: "Production item already exists." });
   }
-  if (!parsed.data.force && save.analysisMethod === "Automatic media inspection") {
+  if (!parsed.data.force && hasCachedAutomaticMediaAnalysis(save)) {
     return NextResponse.json({ save, skipped: true, reason: "Automatic inspection already exists." });
   }
 
@@ -79,7 +88,12 @@ export async function POST(request: Request) {
       visualFrames: parsed.data.visual_frames.map((frame) => ({
         label: frame.label,
         dataUrl: frame.data_url,
+        timestampSeconds: frame.timestamp_seconds,
+        kind: frame.kind,
       })),
+      measuredDurationSeconds: parsed.data.measured_duration_seconds ?? undefined,
+      detectedCutCount: parsed.data.detected_cut_count,
+      frameStats: parsed.data.frame_stats,
       optionalContext: parsed.data.optional_context,
       method: "Automatic media inspection",
     });

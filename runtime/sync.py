@@ -60,7 +60,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def load_config(path: Path = CONFIG_FILE) -> dict[str, str]:
+def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(
             f"Missing {path}. Copy config.example.json to config.json and add credentials."
@@ -98,6 +98,41 @@ def load_config(path: Path = CONFIG_FILE) -> dict[str, str]:
             "Configure at least one destination: the dashboard pair or the Notion pair."
         )
     return data
+
+
+def configured_collections(config: dict[str, Any]) -> list[dict[str, str]]:
+    """Read the new collection list, with the prior single-ID setting as a safe fallback."""
+    raw = config.get("ig_collections")
+    if raw is None:
+        legacy_id = str(config.get("ig_collection_id") or "").strip()
+        return ([{"id": legacy_id, "label": "Saved", "purpose": "reference"}] if legacy_id else [])
+    if not isinstance(raw, list):
+        raise ValueError("ig_collections must be a list of collection objects.")
+    collections: list[dict[str, str]] = []
+    for index, entry in enumerate(raw, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(f"ig_collections entry {index} must be an object.")
+        collection_id = str(entry.get("id") or "").strip()
+        label = str(entry.get("label") or "").strip()
+        purpose = str(entry.get("purpose") or "").strip()
+        if not collection_id or not label or purpose not in {"reference", "recreate"}:
+            raise ValueError("Each ig_collections entry needs id, label, and purpose: reference or recreate.")
+        collections.append({"id": collection_id, "label": label, "purpose": purpose})
+    return collections
+
+
+def merge_collection_post(posts_by_media_id: dict[str, dict[str, Any]], post: dict[str, Any], collection: dict[str, str]) -> None:
+    """Keep one post record while preserving every collection that contains it."""
+    media_id = post["media_id"]
+    current = posts_by_media_id.get(media_id)
+    if current is None:
+        current = {**post, "collections": [], "collection_purpose": "reference"}
+        posts_by_media_id[media_id] = current
+    collections = current["collections"]
+    if not any(item["id"] == collection["id"] for item in collections):
+        collections.append(collection)
+    if collection["purpose"] == "recreate":
+        current["collection_purpose"] = "recreate"
 
 
 def enabled_destinations(config: dict[str, str]) -> tuple[bool, bool]:
@@ -386,6 +421,7 @@ def dashboard_payload(post: dict[str, Any]) -> dict[str, Any]:
         "caption": post["caption"],
         "duration_seconds": float(post.get("duration_sec") or 0) or None,
         "saved_at": datetime.now(timezone.utc).isoformat(),
+        "collections": list(post.get("collections") or []),
     }
 
 
@@ -471,6 +507,16 @@ def sync_post_analysis_to_dashboard(
         post,
         model_name=model_name,
         model_cache=BASE_DIR / ".models",
+        recreate=post.get("collection_purpose") == "recreate",
+    )
+    frame_stats = dict(evidence.get("frame_stats") or {})
+    log.info(
+        "Media analysis for %s: %s frames (%s high, %s low); cache hit=%s",
+        post["media_id"],
+        frame_stats.get("frame_count", len(evidence.get("visual_frames") or [])),
+        frame_stats.get("high_detail_count", 0),
+        frame_stats.get("low_detail_count", 0),
+        frame_stats.get("cache_hit", False),
     )
     response = request_post(
         dashboard_analysis_url(config),
@@ -480,6 +526,9 @@ def sync_post_analysis_to_dashboard(
             "transcript": str(evidence.get("transcript") or ""),
             "visual_observations": str(evidence.get("visual_observations") or ""),
             "visual_frames": list(evidence.get("visual_frames") or []),
+            "measured_duration_seconds": evidence.get("measured_duration_seconds"),
+            "detected_cut_count": evidence.get("detected_cut_count", 0),
+            "frame_stats": frame_stats,
         },
         timeout=180,
     )
@@ -499,7 +548,10 @@ def sync_post_analysis_to_dashboard(
         result = response.json()
     except (requests.JSONDecodeError, ValueError):
         result = {}
-    return not (isinstance(result, dict) and result.get("skipped") is True)
+    cache_hit = isinstance(result, dict) and result.get("skipped") is True
+    if cache_hit:
+        log.info("Dashboard media-analysis cache hit for %s", post["media_id"])
+    return not cache_hit
 
 
 def main() -> int:
@@ -561,20 +613,22 @@ def main() -> int:
                 log.info("No named collections returned")
             for collection in collections:
                 log.info(
-                    "Collection: %s | ID: %s | Type: %s",
-                    collection["name"],
-                    collection["id"],
-                    collection["type"],
+                    '{ "id": "%s", "label": "%s", "purpose": "reference" },',
+                    collection["id"], collection["name"],
                 )
             return 0
-        collection_id = None
-        if not args.all_saves:
-            collection_id = str(config.get("ig_collection_id") or "").strip() or None
-        if collection_id:
-            log.info("Sync target: Instagram collection %s", collection_id)
+        collections = [] if args.all_saves else configured_collections(config)
+        posts_by_media_id: dict[str, dict[str, Any]] = {}
+        if collections:
+            for collection in collections:
+                log.info("Sync target: %s (%s, %s)", collection["label"], collection["id"], collection["purpose"])
+                for post in fetch_saved_posts(session, collection["id"]):
+                    merge_collection_post(posts_by_media_id, post, collection)
         else:
             log.info("Sync target: all saved posts")
-        posts = fetch_saved_posts(session, collection_id)
+            for post in fetch_saved_posts(session, None):
+                posts_by_media_id[post["media_id"]] = {**post, "collections": [], "collection_purpose": "reference"}
+        posts = list(posts_by_media_id.values())
         synced_ids = set(state["synced_ids"])
         dashboard_synced_ids = set(state["dashboard_synced_ids"])
         dashboard_analyzed_ids = set(state.setdefault("dashboard_analyzed_ids", []))

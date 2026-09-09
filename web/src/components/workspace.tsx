@@ -115,6 +115,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
     defaultModeForPairing(availablePairings(initialData.saves[0], initialData.sources).find((pairing) => pairing.recommended) ?? availablePairings(initialData.saves[0], initialData.sources)[0]),
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingShotPlan, setIsGeneratingShotPlan] = useState(false);
   const [isRefreshingDirections, setIsRefreshingDirections] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusUpdates, setStatusUpdates] = useState<
@@ -352,10 +353,9 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
     setIsRefreshingDirections(true);
     setError(null);
     try {
-      const response = await fetch("/api/saves/analyze", {
+      const response = await fetch(`/api/saves/${encodeURIComponent(save.id)}/directions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ saveId: save.id }),
+        headers: { "Content-Type": "application/json" }, body: "{}",
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Directions could not be refreshed.");
@@ -372,6 +372,24 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
       setError(cause instanceof Error ? cause.message : "Directions could not be refreshed.");
     } finally {
       setIsRefreshingDirections(false);
+    }
+  }
+
+  async function generateShotPlan(save: SavedPost, pairing: Pairing, regenerate = false) {
+    setIsGeneratingShotPlan(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/saves/${encodeURIComponent(save.id)}/shot-plan`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pairingId: pairing.id, mode: selectedMode, regenerate }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Shot plan generation failed.");
+      setSaves((items) => items.map((item) => item.id === save.id ? { ...item, shotPlan: result.shotPlan, shotPlanSkeleton: result.skeleton, shotPlanSourceId: pairing.brandSourceId, shotPlanGeneratedAt: new Date().toISOString() } : item));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Shot plan generation failed.");
+    } finally {
+      setIsGeneratingShotPlan(false);
     }
   }
 
@@ -500,10 +518,12 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             selectedFormat={selectedFormat}
             onSelectFormat={setSelectedFormat}
             isGenerating={isGenerating}
+            isGeneratingShotPlan={isGeneratingShotPlan}
             isRefreshingDirections={isRefreshingDirections}
             error={error}
             onOpenCapture={() => setView("capture")}
             onRefreshDirections={refreshDirections}
+            onGenerateShotPlan={generateShotPlan}
           />
         )}
 
@@ -681,10 +701,12 @@ function SavesInbox({
   selectedFormat,
   onSelectFormat,
   isGenerating,
+  isGeneratingShotPlan,
   isRefreshingDirections,
   error,
   onOpenCapture,
   onRefreshDirections,
+  onGenerateShotPlan,
 }: {
   saves: SavedPost[];
   sources: BrandSourceInventory[];
@@ -699,17 +721,22 @@ function SavesInbox({
   selectedFormat: ContentFormat;
   onSelectFormat: (format: ContentFormat) => void;
   isGenerating: boolean;
+  isGeneratingShotPlan: boolean;
   isRefreshingDirections: boolean;
   error: string | null;
   onOpenCapture: () => void;
   onRefreshDirections: (save: SavedPost) => void;
+  onGenerateShotPlan: (save: SavedPost, pairing: Pairing, regenerate?: boolean) => void;
 }) {
+  const [collectionFilter, setCollectionFilter] = useState("all");
   if (!selectedSave) {
     return <EmptyState title="No saved posts yet" body="The local Instagram bridge will place new saves here." />;
   }
 
   const selectablePairings = availablePairings(selectedSave, sources);
   const usableSources = sources.filter((source) => isSourceUsable(source));
+  const collectionLabels = [...new Set(saves.flatMap((save) => save.collectionLabels ?? []))];
+  const visibleSaves = saves.filter((save) => collectionFilter === "all" || (save.collectionLabels ?? []).includes(collectionFilter));
   const selectedModeAvailability = selectedPairing
     ? modeAvailability(selectedPairing, selectablePairings, sources, selectedMode)
     : { enabled: false, reason: "Choose a Mario-owned direction first." };
@@ -719,9 +746,9 @@ function SavesInbox({
       <div className="save-list">
         <div className="list-heading">
           <p className="section-label">Review queue</p>
-          <span>{saves.length} total</span>
+          <label><span>Collection</span><select aria-label="Collection filter" value={collectionFilter} onChange={(event) => setCollectionFilter(event.target.value)}><option value="all">All</option>{collectionLabels.map((label) => <option key={label} value={label}>{label}</option>)}</select></label>
         </div>
-        {saves.map((save) => (
+        {visibleSaves.map((save) => (
           <button
             key={save.id}
             type="button"
@@ -731,6 +758,7 @@ function SavesInbox({
             <span className="save-type">{save.contentType}</span>
             <strong>@{save.author}</strong>
             <small>{formatDate(save.savedAt)}</small>
+            <small>{save.collectionLabels?.join(" · ") || (save.collectionPurpose === "recreate" ? "Recreate" : "Frameworks")}</small>
             <StatusPill status={save.status} />
           </button>
         ))}
@@ -890,6 +918,10 @@ function SavesInbox({
           </>
         )}
 
+        {selectedSave.collectionPurpose === "recreate" && selectedPairing && selectedModeAvailability.enabled && (
+          <ShotPlanPanel save={selectedSave} pairing={selectedPairing} generating={isGeneratingShotPlan} onGenerate={onGenerateShotPlan} />
+        )}
+
         {selectedPairing && selectedModeAvailability.enabled && (
           <div className="approval-dock">
             <div>
@@ -925,6 +957,20 @@ function DetailBlock({ label, text }: { label: string; text: string }) {
       <p>{text}</p>
     </div>
   );
+}
+
+function ShotPlanPanel({ save, pairing, generating, onGenerate }: { save: SavedPost; pairing: Pairing; generating: boolean; onGenerate: (save: SavedPost, pairing: Pairing, regenerate?: boolean) => void }) {
+  const plan = save.shotPlan;
+  return <section className="format-step shot-plan">
+    <div className="pairing-heading"><div><p className="section-label">Shot plan · Recreate</p><h3>{plan ? "Recreate the delivery, not the creator." : "Build the shot-by-shot direction."}</h3></div><span>{save.analysisFrameStats?.frameCount ?? save.analysisFrames?.length ?? 0} cached frames</span></div>
+    {!plan ? <><p className="format-explainer">Uses the cached transcript, measured cut rhythm, and labeled frames. Mario&apos;s lines are written separately from the reference transcript.</p><button type="button" className="secondary-action" disabled={generating} onClick={() => onGenerate(save, pairing)}>{generating ? "Building shot plan…" : "Generate shot plan"}</button></> : <>
+      <p className="format-explainer">{plan.pacingNote} Total runtime: {plan.totalRuntimeSeconds.toFixed(1)}s.</p>
+      <div className="shot-plan-table">{plan.beats.map((beat, index) => <article key={`${beat.startSeconds}-${index}`}><span>{beat.startSeconds.toFixed(1)}–{(beat.startSeconds + beat.durationSeconds).toFixed(1)}s · {beat.beatFunction}</span><strong>{beat.draftLine}</strong><small>{beat.shotType} · {beat.framing}{beat.onScreenText ? ` · text ${beat.onScreenText.position}: ${beat.onScreenText.text}` : ""}</small></article>)}</div>
+      <p className="section-label">Production checklist</p><ul>{plan.productionChecklist.map((item) => <li key={item}>{item}</li>)}</ul>
+      <p className="section-label">Line replacement map</p><div className="shot-plan-table">{plan.lineReplacementMap.map((item, index) => <article key={`${item.beatFunction}-${index}`}><span>{item.beatFunction}</span><strong>{item.marioReplacementLine}</strong></article>)}</div>
+      <button type="button" className="secondary-action" disabled={generating} onClick={() => onGenerate(save, pairing, true)}>{generating ? "Regenerating shot plan…" : "Regenerate shot plan"}</button>
+    </>}
+  </section>;
 }
 
 function ProductionBoard({
