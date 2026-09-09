@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { BrandSource, SavedPost } from "./domain";
-import { isSourceAvailableForPairing } from "./brand-source-eligibility";
+import { isSourceUsable } from "./brand-source-eligibility";
 import { analyzeSavedPost, type SaveInspectionEvidence } from "./save-analysis";
 import { supabaseRequest } from "./supabase-rest";
 
@@ -32,9 +32,11 @@ export async function loadRankableBrandSources() {
     }>>("pairings?select=brand_source_id,recommended,created_at&order=created_at.desc&limit=500"),
   ]);
 
-  return sourceRows.filter((source) => isSourceAvailableForPairing({
+  return sourceRows.filter((source) => isSourceUsable({
     sourceType: source.source_type,
     retired: source.retired,
+    privacyStatus: source.privacy_status,
+    status: source.status as BrandSource["status"],
     dispatchOccurredOn: source.dispatch_occurred_on,
     dispatchFreshnessDays: source.dispatch_freshness_days,
   })).map((source) => {
@@ -46,6 +48,7 @@ export async function loadRankableBrandSources() {
       coreTruth: source.core_truth,
       storyEvidence: source.story_evidence,
       privacyStatus: source.privacy_status,
+      status: source.status as BrandSource["status"],
       pillars: source.pillars,
       sourceUrl: source.source_url,
       retired: source.retired,

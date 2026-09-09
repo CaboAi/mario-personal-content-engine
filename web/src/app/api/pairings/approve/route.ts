@@ -44,13 +44,6 @@ export async function POST(request: Request) {
   if (!save || !pairing) {
     return NextResponse.json({ error: "Save or pairing not found." }, { status: 404 });
   }
-  if (pairing.privacyStatus !== "Clear") {
-    return NextResponse.json(
-      { error: "This source still requires privacy confirmation." },
-      { status: 409 },
-    );
-  }
-
   try {
     if (!pairing.brandSourceId) {
       return NextResponse.json({ error: "Pairing has no Mario source." }, { status: 409 });
@@ -58,7 +51,7 @@ export async function POST(request: Request) {
     const sources = await supabaseRequest<Array<{
       id: string; source_type: BrandSource["sourceType"]; title: string; core_truth: string;
       story_evidence: string; privacy_status: BrandSource["privacyStatus"]; pillars: string[];
-      source_url?: string; retired: boolean; dispatch_what_happened?: string;
+      source_url?: string; retired: boolean; status: BrandSource["status"]; dispatch_what_happened?: string;
       dispatch_specific_detail?: string; dispatch_decision?: string; dispatch_occurred_on?: string;
       dispatch_next_implication?: string; dispatch_freshness_days?: number;
     }>>(`brand_sources?id=eq.${encodeURIComponent(pairing.brandSourceId)}&select=*`);
@@ -67,7 +60,7 @@ export async function POST(request: Request) {
     const source: BrandSource = {
       id: row.id, sourceType: row.source_type, title: row.title, coreTruth: row.core_truth,
       storyEvidence: row.story_evidence, privacyStatus: row.privacy_status, pillars: row.pillars,
-      sourceUrl: row.source_url, retired: row.retired,
+      sourceUrl: row.source_url, retired: row.retired, status: row.status,
       dispatchWhatHappened: row.dispatch_what_happened, dispatchSpecificDetail: row.dispatch_specific_detail,
       dispatchDecision: row.dispatch_decision, dispatchOccurredOn: row.dispatch_occurred_on,
       dispatchNextImplication: row.dispatch_next_implication, dispatchFreshnessDays: row.dispatch_freshness_days,

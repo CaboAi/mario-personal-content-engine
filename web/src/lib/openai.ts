@@ -175,9 +175,6 @@ export async function generateFullScript(
   if (!supportsFullDraft(content.format)) {
     throw new Error(`${content.format} intentionally does not use a padded full draft.`);
   }
-  if (source.privacyStatus !== "Clear" || source.status !== "Verified") {
-    throw new Error("The Mario-owned source is not Clear and Verified.");
-  }
   const draftKind = fullDraftKind(content.format);
   const contentMode = content.mode;
   if (!isLegalModeFormat(contentMode, content.format)) {

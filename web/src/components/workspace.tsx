@@ -24,7 +24,7 @@ import type {
   ProductionStatus,
   SavedPost,
 } from "@/lib/domain";
-import { isSourceAvailableForPairing } from "@/lib/brand-source-eligibility";
+import { isSourceUsable } from "@/lib/brand-source-eligibility";
 import { fullDraftKind, getLegalFormats, initialProductionStatus, productionStatusesFor, supportsFullDraft } from "@/lib/format-contracts";
 import { getExperimentMetricRows } from "@/lib/performance";
 
@@ -75,14 +75,13 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function isPairingAvailableForSelection(pairing: Pairing) {
-  if (pairing.sourceType === "Existing Content") return false;
-  if (pairing.privacyStatus !== "Clear") return false;
-  return isSourceAvailableForPairing({ ...pairing, retired: pairing.retired ?? false });
+function isPairingAvailableForSelection(pairing: Pairing, sources: BrandSourceInventory[]) {
+  const source = sources.find((candidate) => candidate.id === pairing.brandSourceId);
+  return Boolean(source && isSourceUsable(source));
 }
 
-function availablePairings(save?: SavedPost) {
-  return (save?.pairings ?? []).filter(isPairingAvailableForSelection);
+function availablePairings(save: SavedPost | undefined, sources: BrandSourceInventory[]) {
+  return (save?.pairings ?? []).filter((pairing) => isPairingAvailableForSelection(pairing, sources));
 }
 
 function defaultModeForPairing(pairing?: Pairing): ContentMode {
@@ -107,15 +106,16 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const [sources, setSources] = useState(initialData.sources);
   const [selectedSaveId, setSelectedSaveId] = useState(initialData.saves[0]?.id);
   const [selectedPairingId, setSelectedPairingId] = useState<string | undefined>(
-    availablePairings(initialData.saves[0]).find((pairing) => pairing.recommended)?.id ?? availablePairings(initialData.saves[0])[0]?.id,
+    availablePairings(initialData.saves[0], initialData.sources).find((pairing) => pairing.recommended)?.id ?? availablePairings(initialData.saves[0], initialData.sources)[0]?.id,
   );
   const [selectedFormat, setSelectedFormat] = useState<ContentFormat>(
     suggestedFormat(initialData.saves[0]?.contentType),
   );
   const [selectedMode, setSelectedMode] = useState<ContentMode>(() =>
-    defaultModeForPairing(availablePairings(initialData.saves[0]).find((pairing) => pairing.recommended) ?? availablePairings(initialData.saves[0])[0]),
+    defaultModeForPairing(availablePairings(initialData.saves[0], initialData.sources).find((pairing) => pairing.recommended) ?? availablePairings(initialData.saves[0], initialData.sources)[0]),
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRefreshingDirections, setIsRefreshingDirections] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusUpdates, setStatusUpdates] = useState<
     Record<string, { saving: boolean; error?: string; saved?: boolean }>
@@ -134,7 +134,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   >({});
 
   const selectedSave = saves.find((save) => save.id === selectedSaveId);
-  const selectedPairing = availablePairings(selectedSave).find(
+  const selectedPairing = availablePairings(selectedSave, sources).find(
     (pairing) => pairing.id === selectedPairingId,
   );
   const reviewCount = saves.filter((save) => save.status === "Needs Review").length;
@@ -144,7 +144,7 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
   const inventoryCount = content.filter(
     (item) => !item.archivedAt && item.status !== "Posted",
   ).length;
-  const usableSourceCount = sources.filter((source) => isSourceAvailableForPairing(source)).length;
+  const usableSourceCount = sources.filter((source) => isSourceUsable(source)).length;
 
   async function approveAndGenerate() {
     if (!selectedSave || !selectedPairing) return;
@@ -347,6 +347,34 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
     }
   }
 
+  async function refreshDirections(save: SavedPost) {
+    if (!initialData.liveMode) return;
+    setIsRefreshingDirections(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/saves/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saveId: save.id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Directions could not be refreshed.");
+      const refreshedSave = result.save as SavedPost;
+      const pairings = availablePairings(refreshedSave, sources);
+      const pairing = pairings.find((candidate) => candidate.recommended) ?? pairings[0];
+      setSaves((items) => items.map((item) => item.id === refreshedSave.id ? refreshedSave : item));
+      setSelectedPairingId(pairing?.id);
+      const mode = defaultModeForPairing(pairing);
+      setSelectedMode(mode);
+      const suggested = suggestedFormat(refreshedSave.contentType);
+      setSelectedFormat(getLegalFormats(mode).includes(suggested) ? suggested : getLegalFormats(mode)[0]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Directions could not be refreshed.");
+    } finally {
+      setIsRefreshingDirections(false);
+    }
+  }
+
   async function updatePlannedDate(id: string, plannedFor: string | null) {
     const previous = content.find((item) => item.id === id);
     if (!previous || previous.plannedFor === plannedFor) return;
@@ -441,11 +469,12 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
         {view === "saves" && (
           <SavesInbox
             saves={saves}
+            sources={sources}
             selectedSave={selectedSave}
             selectedPairing={selectedPairing}
             selectedPairingId={selectedPairingId}
             onSelectSave={(save) => {
-              const pairings = availablePairings(save);
+              const pairings = availablePairings(save, sources);
               const pairing = pairings.find((candidate) => candidate.recommended) ?? pairings[0];
               setSelectedSaveId(save.id);
               setSelectedPairingId(pairing?.id);
@@ -471,8 +500,10 @@ export function Workspace({ initialData }: { initialData: DashboardData }) {
             selectedFormat={selectedFormat}
             onSelectFormat={setSelectedFormat}
             isGenerating={isGenerating}
+            isRefreshingDirections={isRefreshingDirections}
             error={error}
             onOpenCapture={() => setView("capture")}
+            onRefreshDirections={refreshDirections}
           />
         )}
 
@@ -617,7 +648,11 @@ function Metric({ value, label }: { value: number; label: string }) {
   );
 }
 
-function modeAvailability(pairing: Pairing, pairings: Pairing[], mode: ContentMode) {
+function modeAvailability(pairing: Pairing, pairings: Pairing[], sources: BrandSourceInventory[], mode: ContentMode) {
+  const source = sources.find((candidate) => candidate.id === pairing.brandSourceId);
+  if (!source || !isSourceUsable(source)) {
+    return { enabled: false, reason: "This source is no longer usable." };
+  }
   if (mode === "Dispatch" && pairing.sourceType !== "Dispatch") {
     return {
       enabled: false,
@@ -634,6 +669,7 @@ function modeAvailability(pairing: Pairing, pairings: Pairing[], mode: ContentMo
 
 function SavesInbox({
   saves,
+  sources,
   selectedSave,
   selectedPairing,
   selectedPairingId,
@@ -645,10 +681,13 @@ function SavesInbox({
   selectedFormat,
   onSelectFormat,
   isGenerating,
+  isRefreshingDirections,
   error,
   onOpenCapture,
+  onRefreshDirections,
 }: {
   saves: SavedPost[];
+  sources: BrandSourceInventory[];
   selectedSave?: SavedPost;
   selectedPairing?: Pairing;
   selectedPairingId?: string;
@@ -660,16 +699,19 @@ function SavesInbox({
   selectedFormat: ContentFormat;
   onSelectFormat: (format: ContentFormat) => void;
   isGenerating: boolean;
+  isRefreshingDirections: boolean;
   error: string | null;
   onOpenCapture: () => void;
+  onRefreshDirections: (save: SavedPost) => void;
 }) {
   if (!selectedSave) {
     return <EmptyState title="No saved posts yet" body="The local Instagram bridge will place new saves here." />;
   }
 
-  const selectablePairings = availablePairings(selectedSave);
+  const selectablePairings = availablePairings(selectedSave, sources);
+  const usableSources = sources.filter((source) => isSourceUsable(source));
   const selectedModeAvailability = selectedPairing
-    ? modeAvailability(selectedPairing, selectablePairings, selectedMode)
+    ? modeAvailability(selectedPairing, selectablePairings, sources, selectedMode)
     : { enabled: false, reason: "Choose a Mario-owned direction first." };
 
   return (
@@ -725,7 +767,7 @@ function SavesInbox({
             <p className="section-label">Step 1 · Mario-owned direction</p>
             <h3>{selectablePairings.length === 3 ? "Choose one of three different Mario directions" : "Choose a Mario direction"}</h3>
           </div>
-          <span>{selectablePairings.length} verified source{selectablePairings.length === 1 ? "" : "s"} available</span>
+          <span>{usableSources.length} verified source{usableSources.length === 1 ? "" : "s"} available</span>
         </div>}
 
         {selectedSave.status !== "New" && (
@@ -743,13 +785,23 @@ function SavesInbox({
           </div>
         )}
 
-        {selectedSave.status !== "New" && selectablePairings.length === 0 && (
+        {selectedSave.status !== "New" && usableSources.length === 0 && (
           <section className="empty-state source-empty-state">
             <span className="empty-line" />
             <p className="section-label">No usable Mario source</p>
             <h3>Capture material before choosing a direction.</h3>
             <p>Retired and expired sources cannot feed generation.</p>
             <button className="primary-action" type="button" onClick={onOpenCapture}>Capture a source</button>
+          </section>
+        )}
+
+        {selectedSave.status !== "New" && usableSources.length > 0 && selectablePairings.length === 0 && (
+          <section className="empty-state source-empty-state">
+            <span className="empty-line" />
+            <p className="section-label">Directions need a refresh</p>
+            <h3>Current sources are ready. Rebuild directions for this saved reference.</h3>
+            <p>The available sources were captured after this save was last analyzed.</p>
+            <button className="primary-action" type="button" disabled={isRefreshingDirections} onClick={() => onRefreshDirections(selectedSave)}>{isRefreshingDirections ? "Refreshing directions…" : "Refresh directions"}</button>
           </section>
         )}
 
@@ -797,7 +849,7 @@ function SavesInbox({
             <p className="format-explainer">Dispatches report progress, Practical pieces leave a usable artifact, and Reflections make a dated claim from a past event.</p>
             <div className="format-picker" role="radiogroup" aria-label="Content mode">
               {contentModes.map((mode) => {
-                const availability = modeAvailability(selectedPairing, selectablePairings, mode.id);
+                const availability = modeAvailability(selectedPairing, selectablePairings, sources, mode.id);
                 return <button
                   key={mode.id}
                   type="button"
@@ -1592,7 +1644,7 @@ function BrandSystem({ sources }: { sources: BrandSourceInventory[] }) {
     return source.sourceType;
   }
 
-  const usableSources = sources.filter((source) => isSourceAvailableForPairing(source));
+  const usableSources = sources.filter((source) => isSourceUsable(source));
 
   return (
     <section className="brand-layout stagger-in">

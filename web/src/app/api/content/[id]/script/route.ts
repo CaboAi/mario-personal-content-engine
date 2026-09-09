@@ -23,7 +23,7 @@ type SourceRow = {
   core_truth: string;
   story_evidence: string;
   privacy_status: "Clear" | "Needs confirmation";
-  status: string;
+  status: BrandSource["status"];
   pillars: string[];
   source_url?: string;
   retired: boolean;

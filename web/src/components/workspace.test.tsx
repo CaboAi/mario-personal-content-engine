@@ -4,11 +4,20 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Workspace } from "./workspace";
 import { demoData, generatedDemoPackage } from "@/lib/demo-data";
+import type { BrandSourceInventory } from "@/lib/domain";
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+
+function usableSource(id: string, sourceType: "Story" | "Daily Entry" = "Story"): BrandSourceInventory {
+  return {
+    id, sourceType, title: `${sourceType} source`, coreTruth: "A verified Mario-owned truth.",
+    storyEvidence: "Concrete verified evidence.", privacyStatus: "Clear", pillars: ["Action"],
+    status: "Verified", retired: false, updatedAt: "2026-09-08T00:00:00Z", usageCount: 0,
+  };
+}
 
 function openProduction(cta?: string) {
   render(
@@ -75,6 +84,7 @@ describe("Production package instructions", () => {
   it("explains why the three Mario directions are different", () => {
     render(<Workspace initialData={{
       ...demoData,
+      sources: demoData.saves[0].pairings.map((pairing, index) => usableSource(`current-source-${index}`)),
       saves: [{
         ...demoData.saves[0],
         analysisMethod: "Automatic media inspection",
@@ -519,6 +529,7 @@ describe("Save source and format decisions", () => {
   it("never offers retired directions", () => {
     render(<Workspace initialData={{
       ...demoData,
+      sources: [usableSource("current-source")],
       saves: [{
         ...demoData.saves[0],
         pairings: [
@@ -536,6 +547,7 @@ describe("Save source and format decisions", () => {
   it("shows Capture instead of directions when no usable source remains", () => {
     render(<Workspace initialData={{
       ...demoData,
+      sources: [],
       saves: [{
         ...demoData.saves[0],
         pairings: demoData.saves[0].pairings.map((pairing) => ({ ...pairing, retired: true })),
@@ -549,9 +561,27 @@ describe("Save source and format decisions", () => {
     expect(screen.getByRole("heading", { name: "Capture" })).toBeTruthy();
   });
 
+  it("offers to refresh directions when sources are usable but the save only has stale pairings", () => {
+    render(<Workspace initialData={{
+      ...demoData,
+      sources: [usableSource("current-source")],
+      saves: [{
+        ...demoData.saves[0],
+        pairings: demoData.saves[0].pairings.map((pairing) => ({ ...pairing, brandSourceId: "retired-source" })),
+      }],
+    }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
+
+    expect(screen.getByText("1 verified source available")).toBeTruthy();
+    expect(screen.getByText("Directions need a refresh")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Refresh directions" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Capture a source" })).toBeNull();
+  });
+
   it("disables Dispatch when the selected direction has no fresh Dispatch source", () => {
     render(<Workspace initialData={{
       ...demoData,
+      sources: [usableSource("story-source")],
       saves: [{
         ...demoData.saves[0],
         pairings: [{
@@ -567,9 +597,32 @@ describe("Save source and format decisions", () => {
     expect(screen.getByText("No fresh Dispatch source captured.")).toBeTruthy();
   });
 
+  it("uses the same usable-source count in Brand System and Step 1", () => {
+    const sources = [usableSource("story-source", "Story"), usableSource("daily-source", "Daily Entry")];
+    render(<Workspace initialData={{
+      ...demoData,
+      sources,
+      saves: [{
+        ...demoData.saves[0],
+        pairings: [
+          { ...demoData.saves[0].pairings[0], id: "story-pairing", brandSourceId: "story-source", sourceType: "Story", sourceTitle: "Story source", privacyStatus: "Clear" },
+          { ...demoData.saves[0].pairings[1], id: "daily-pairing", brandSourceId: "daily-source", sourceType: "Daily Entry", sourceTitle: "Daily Entry source", privacyStatus: "Clear" },
+        ],
+      }],
+    }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Brand System" }));
+    expect(screen.getByText("2 usable · 2 recorded")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Saves Inbox" }));
+    expect(screen.getByText("2 verified sources available")).toBeTruthy();
+    expect(screen.getByText(/Mario source: Story source/)).toBeTruthy();
+    expect(screen.getByText(/Mario source: Daily Entry source/)).toBeTruthy();
+  });
+
   it("separates delivery mechanics, Mario substance, and output format", () => {
     render(<Workspace initialData={{
       ...demoData,
+      sources: demoData.saves[0].pairings.map((pairing, index) => usableSource(`current-${index}`)),
       saves: [{
         ...demoData.saves[0],
         pairings: demoData.saves[0].pairings.map((pairing, index) => ({

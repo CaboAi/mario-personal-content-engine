@@ -94,10 +94,10 @@ export type BrandSource = {
   dispatchOccurredOn?: string;
   dispatchNextImplication?: string;
   dispatchFreshnessDays?: number;
+  status: "Captured" | "Verified" | "Used" | "Retired";
 };
 
 export type BrandSourceInventory = BrandSource & {
-  status: "Captured" | "Verified" | "Used" | "Retired";
   sourceExternalId?: string;
   createdAt?: string;
   updatedAt: string;

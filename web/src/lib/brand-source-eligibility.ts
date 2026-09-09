@@ -2,13 +2,14 @@ import type { BrandSource, ContentMode } from "./domain";
 
 export const DISPATCH_FRESHNESS_DAYS = 30;
 
-type SourceEligibilityFields = Pick<
+export type SourceUsabilityFields = Pick<
   BrandSource,
-  "sourceType" | "retired" | "dispatchWhatHappened" | "dispatchSpecificDetail" |
+  "sourceType" | "retired" | "privacyStatus" | "status" |
+  "dispatchWhatHappened" | "dispatchSpecificDetail" |
   "dispatchDecision" | "dispatchOccurredOn" | "dispatchNextImplication" | "dispatchFreshnessDays"
 >;
 
-export function isFreshDispatchSource(source: Pick<SourceEligibilityFields, "sourceType" | "dispatchOccurredOn" | "dispatchFreshnessDays">, now = new Date()) {
+export function isFreshDispatchSource(source: Pick<SourceUsabilityFields, "sourceType" | "dispatchOccurredOn" | "dispatchFreshnessDays">, now = new Date()) {
   if (source.sourceType !== "Dispatch" || !source.dispatchOccurredOn) return false;
   const occurredAt = new Date(`${source.dispatchOccurredOn}T00:00:00.000Z`);
   if (Number.isNaN(occurredAt.getTime())) return false;
@@ -16,13 +17,23 @@ export function isFreshDispatchSource(source: Pick<SourceEligibilityFields, "sou
   return occurredAt.getTime() + freshnessDays * 86_400_000 >= now.getTime();
 }
 
-export function isSourceAvailableForPairing(source: Pick<SourceEligibilityFields, "sourceType" | "retired" | "dispatchOccurredOn" | "dispatchFreshnessDays">, now = new Date()) {
-  return !source.retired && (source.sourceType !== "Dispatch" || isFreshDispatchSource(source, now));
+/** The only definition of a source that may enter content workflows. */
+export function isSourceUsable(source: SourceUsabilityFields, now = new Date()) {
+  return source.retired === false
+    && source.status === "Verified"
+    && source.privacyStatus === "Clear"
+    && (source.sourceType !== "Dispatch" || isFreshDispatchSource(source, now));
 }
 
-export function assertSourceEligibleForMode(source: SourceEligibilityFields, mode: ContentMode, now = new Date()) {
-  if (source.retired) {
-    throw new Error("This Mario source is retired and cannot be used for generation. Capture a current source instead.");
+export function assertSourceEligibleForMode(source: SourceUsabilityFields, mode: ContentMode, now = new Date()) {
+  if (!isSourceUsable(source, now)) {
+    if (source.retired) {
+      throw new Error("This Mario source is retired and cannot be used for generation. Capture a current source instead.");
+    }
+    if (source.status !== "Verified" || source.privacyStatus !== "Clear") {
+      throw new Error("This Mario source must be Clear and Verified before it can be used for generation.");
+    }
+    throw new Error("This Dispatch source has expired and cannot be used for generation.");
   }
   if (mode === "Dispatch" && source.sourceType !== "Dispatch") {
     throw new Error("Dispatch mode requires a current Dispatch source.");

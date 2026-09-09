@@ -1,5 +1,5 @@
-import type { Pairing } from "./domain";
-import { isSourceAvailableForPairing } from "./brand-source-eligibility";
+import type { BrandSource, Pairing } from "./domain";
+import { isSourceUsable } from "./brand-source-eligibility";
 
 export const SOURCE_SELECTION_ROLES = [
   "Best structural fit",
@@ -14,6 +14,7 @@ export type PairingCandidate = Omit<
   "id" | "recommended" | "selectionRole" | "fitScore"
 > & {
   brandSourceId: string;
+  sourceStatus: BrandSource["status"];
   fitScore: number;
   angleCategory:
     | "Lived story"
@@ -62,7 +63,11 @@ function noveltyScore(candidate: PairingCandidate, selected: PairingCandidate[])
 export function selectDiversePairings(candidates: PairingCandidate[]) {
   const bestBySource = new Map<string, PairingCandidate>();
   for (const candidate of candidates) {
-    if (!isSourceAvailableForPairing({ ...candidate, retired: candidate.retired ?? false })) continue;
+    if (!isSourceUsable({
+      ...candidate,
+      retired: candidate.retired ?? false,
+      status: candidate.sourceStatus,
+    })) continue;
     if (normalizedScore(candidate) < 60) continue;
     const existing = bestBySource.get(candidate.brandSourceId);
     if (!existing || stableCandidateOrder(candidate, existing) < 0) {

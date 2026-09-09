@@ -168,6 +168,7 @@ export async function analyzeSavedPost(
       storyEvidence: source.storyEvidence,
       pillars: source.pillars,
       privacyStatus: source.privacyStatus,
+      sourceStatus: source.status,
       retired: source.retired,
       dispatchOccurredOn: source.dispatchOccurredOn,
       dispatchFreshnessDays: source.dispatchFreshnessDays,
